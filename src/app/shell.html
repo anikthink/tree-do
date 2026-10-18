@@ -1,0 +1,59 @@
+
+<div class="top" id="top"><span class="date" id="topDate"></span><span class="count" id="topCount"></span></div>
+
+<canvas id="map" aria-label="Map of today's tasks. Use the task list buttons to move around by keyboard."></canvas>
+
+<nav class="sr-only" aria-label="Tasks"><ul id="a11y"></ul></nav>
+<div id="live" class="sr-only" aria-live="polite"></div>
+
+<div class="ctrl" id="ctrl">
+  <button class="cbtn" id="zoomIn" type="button" aria-label="Zoom in" title="Zoom in"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="cbtn" id="zoomOut" type="button" aria-label="Zoom out" title="Zoom out"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+  <button class="cbtn fit" id="fitBtn" type="button" aria-label="Fit whole map" title="Fit whole map"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></svg></button>
+</div>
+
+<section class="sheet" id="sheet" data-snap="peek" data-tab="today" aria-label="Today's tasks">
+  <div class="hrule" id="hrule" aria-hidden="true"></div>
+  <button class="grab" id="grab" type="button" aria-expanded="false" aria-controls="sheet" aria-label="Sheet collapsed. Activate to expand; arrow keys move it."></button>
+  <div class="peek" id="peek">
+    <div class="shead">
+      <span class="sdate" id="sDate"></span><span class="scount" id="sCount"></span>
+      <span class="views" role="tablist" aria-label="Views">
+        <button class="tab" role="tab" type="button" id="tab-today" data-tab="today" aria-controls="pToday" aria-selected="true" title="Today"><svg class="i" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8.5 12.2l2.3 2.3 4.7-5"/></svg><span class="sr-only">Today</span></button>
+        <button class="tab" role="tab" type="button" id="tab-tt" data-tab="tt" aria-controls="pTT" aria-selected="false" tabindex="-1" title="Plan"><svg class="i" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><span class="sr-only">Plan</span></button>
+        <button class="tab" role="tab" type="button" id="tab-key" data-tab="key" aria-controls="pKey" aria-selected="false" tabindex="-1" title="Key"><svg class="i" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="8" r="2"/><circle cx="7" cy="16" r="2"/><path d="M12 8h7M12 16h7"/></svg><span class="sr-only">Key</span></button>
+      </span>
+    </div>
+    <div class="next" id="next"></div>
+    <div class="undobar" id="undoBar" role="status"><span class="tg" id="undoTag" aria-hidden="true"></span><span class="msg" id="undoMsg"></span><button class="undo" id="undoBtn" type="button">Undo</button></div>
+  </div>
+  <div class="body">
+    <div class="scroll" id="scroll">
+      <div class="panel" id="pToday" role="tabpanel" aria-labelledby="tab-today">
+        <div class="add" id="addBox">
+          <label class="sr-only" for="addInput">Add a task</label>
+          <span class="plus"><svg class="i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          <input id="addInput" type="text" autocomplete="off" spellcheck="false" enterkeyhint="done" placeholder="Add a task…">
+          <div class="chips" id="chips" aria-live="polite"></div>
+        </div>
+        <div id="todayList"></div>
+      </div>
+      <div class="panel" id="pTT" role="tabpanel" aria-labelledby="tab-tt"><div id="ttBody"></div></div>
+      <div class="panel" id="pKey" role="tabpanel" aria-labelledby="tab-key">
+        <h3 class="sec-h">Lists</h3>
+        <div id="lines"></div>
+        <div class="keys">
+          <div class="key"><svg width="36" height="18" aria-hidden="true"><line x1="1" y1="9" x2="26" y2="9" stroke="#D5D9E0" stroke-width="2" stroke-linecap="round"/><circle cx="29" cy="9" r="3.5" fill="#fff" stroke="#BFC6CF" stroke-width="1.75"/></svg><div><b>Later</b><span>Coming up. Finish the tasks before it, or tick it now to skip ahead.</span></div></div>
+          <div class="key"><svg width="36" height="18" aria-hidden="true"><line x1="3" y1="9" x2="24" y2="9" stroke="#2F7CF6" stroke-width="5" stroke-linecap="round"/><circle cx="28" cy="9" r="5.5" fill="#fff" stroke="#2F7CF6" stroke-width="3"/></svg><div><b>Ready</b><span>Ready now. Tick it here or tap it on the map.</span></div></div>
+          <div class="key"><svg width="36" height="18" aria-hidden="true"><line x1="3" y1="9" x2="24" y2="9" stroke="#14A38B" stroke-width="5" stroke-linecap="round"/><circle cx="28" cy="9" r="8" fill="#fff"/><circle cx="28" cy="9" r="7" fill="#14A38B"/><path d="M24.9 9.1l2.2 2.2 4.1-4.5" stroke="#fff" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Done</b><span>Ticked off today.</span></div></div>
+          <div class="key"><svg width="36" height="18" aria-hidden="true"><circle cx="18" cy="9" r="6.5" fill="#fff" stroke="#1C2430" stroke-width="3"/></svg><div><b>Start</b><span>Where the day starts. Upkeep begins here.</span></div></div>
+        </div>
+        <p class="tip">Tap a task to tick it off, even one that comes later. Hold it (or right-click) for later today, tomorrow or someday. Pull this sheet up for the plan.</p>
+      </div>
+    </div>
+  </div>
+  <div class="hold" id="hold" role="group" aria-label="Task actions">
+    <div class="hold-head" id="holdHead"></div>
+    <div class="hacts" id="hacts" role="menu"></div>
+  </div>
+</section>
