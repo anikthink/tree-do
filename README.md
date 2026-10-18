@@ -4,7 +4,9 @@ A to-do app for ADHD brains, drawn as a map. Each day starts on one line: Upkeep
 
 - **Ready now / Later / Done**, with a round checkbox to tick tasks off.
 - **Type tasks the way you'd say them:** `stretch daily 9am #health`, `call mum friday`, `water plants every 3 days`, `laundry every sunday` (repeats, times, days and lists are picked up).
+- **Put it in the right place:** `fold clothes after laundry` (or `before …`) adds it right next to that task, on the same list and branch and on the same days. You can also drag any task to a new spot: hold and drag in the Today lists, or use the grip in Plan.
 - **Branches:** any task can start a branch, and branches can branch again.
+- **The map:** the track to a task stays dashed until it's done (grey while it's later, in the list's colour when it's ready), then fills in solid when you tick it.
 - **Hold a task** for: later today, tomorrow, someday, do it now (skip ahead), branch, edit, delete. Everything can be undone.
 - **No overdue pile.** The map is rebuilt each morning (your day starts at 4am by default): unfinished one-off tasks carry over quietly and repeats come back on their days.
 - **Layout:** on desktop the panel is pinned beside a left-to-right map; on phones lists become columns and the panel is a pull-up sheet.
@@ -59,9 +61,10 @@ src/map/                 the canvas map
 
 src/ui/                  the panel
   sheet.ts               snap points, spring, pinned panel
+  drag.ts                drag a row to move its task (Today and Plan)
   views.ts               Today / Plan / Key tabs
   today.ts               header count, next-up row, Ready now / Later / Done
-  add.ts                 add field, chips, branch mode
+  add.ts                 add field (above every view), chips, branch mode, "after …" placement
   plan.ts                the Plan tab (timetable)
   key.ts                 the Key tab
   hold.ts                hold menu

@@ -2,12 +2,13 @@
 import type { App } from '../app/context';
 import type { Store } from '../app/store';
 import { allLines } from '../domain/lines';
-import { isDone } from '../domain/rules';
+import { canPlace, isDone, taskById } from '../domain/rules';
 import { minutesOf, pad2, shortDate, toMin } from '../domain/time';
 import type { Station } from '../map/layout';
 import { countdown, metaFor, vstate } from '../map/status';
 import { closestEl, esc, focusEl, type Dom } from './dom';
 import { metaHtml, metaText } from './format';
+import { installDrag } from './drag';
 import { TICK, icon } from './icons';
 
 type RowKind = 'open' | 'enroute' | 'locked' | 'done';
@@ -80,10 +81,13 @@ export function createTodayView(store: Store, dom: Dom, app: App) {
   function rowFor(s: Station, kind: RowKind): string {
     const l = s.line, title = s.t?.title ?? '';
     const meta = `<span class="ldot" style="background:${l.color}"></span>${esc(l.name)}${metaFor(s) ? ' · ' + metaHtml(st, s) : ''}${kind === 'enroute' ? ' · Opening next' : ''}${countdown(st, s) ? ' · ' + countdown(st, s) : ''}`;
-    return `<div class="srow ${kind === 'enroute' ? 'locked' : kind}">${checkHtml(s, kind)}
+    return `<div class="srow ${kind === 'enroute' ? 'locked' : kind}" data-id="${s.key}">${checkHtml(s, kind)}
       <button class="main" type="button" data-hold="${s.key}" aria-label="${esc(title)}, ${esc(l.name)}, ${esc(metaText(st, s).toLowerCase())}. Open task actions."><span class="tx"><span class="t">${esc(title)}</span><span class="m">${meta}</span></span>${icon('more', 18)}</button></div>`;
   }
+  let stale = false;   // a refresh came in mid-drag; render once it ends
   function renderToday(list: Station[]): void {
+    if (drag.busy()) { stale = true; return; }
+    stale = false;
     const groups: { open: Station[]; ahead: Station[]; done: Station[] } = { open: [], ahead: [], done: [] };
     list.forEach(s => { const v = vstate(st, s.key); if (v === 'done') groups.done.push(s); else if (v === 'open') groups.open.push(s); else groups.ahead.push(s); });
     const active = document.activeElement;
@@ -106,7 +110,25 @@ export function createTodayView(store: Store, dom: Dom, app: App) {
     if (closestEl(e.target, '[data-full]')) { app.setSnap('full'); app.setTab('today'); return; }
     const h = closestEl(e.target, '[data-hold]'); if (h?.dataset.hold) app.openMenu(h.dataset.hold);
   });
-  todayList.addEventListener('contextmenu', e => { const h = closestEl(e.target, '[data-hold]'); if (h?.dataset.hold) { e.preventDefault(); app.openMenu(h.dataset.hold); } });
+  todayList.addEventListener('contextmenu', e => {
+    const h = closestEl(e.target, '[data-hold]'); if (!h?.dataset.hold) return;
+    e.preventDefault(); if (!drag.busy()) app.openMenu(h.dataset.hold);
+  });
+  // drag a task onto another to put it right before or after it (any list, any branch)
+  const drag = installDrag({
+    root: todayList, scroller: dom.scroll, handle: '.main', grip: false, row: '.srow',
+    idOf: row => row.dataset.id,
+    targets: id => {
+      const t = taskById(st.plan.tasks, id);
+      return [...todayList.querySelectorAll<HTMLElement>('.srow[data-id]')].filter(r => {
+        const target = r.dataset.id ? taskById(st.plan.tasks, r.dataset.id) : undefined;
+        return !!t && !!target && canPlace(st.plan.tasks, t, target);
+      });
+    },
+    drop: (id, targetId, where) => app.place(id, targetId, where),
+    held: id => app.openMenu(id),
+    cancelled: () => { if (stale) app.refreshHud(); },
+  });
 
   function refreshHud(): void {
     const list = st.map.stations.filter(s => s.t && !s.old);

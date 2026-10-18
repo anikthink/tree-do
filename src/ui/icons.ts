@@ -14,6 +14,7 @@ const ICON_P = {
   up: '<path d="M12 19V5M6.5 10.5L12 5l5.5 5.5"/>',
   down: '<path d="M12 5v14M6.5 13.5L12 19l5.5-5.5"/>',
   more: '<path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.8"/>',
+  grip: '<path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="2.6"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   back: '<path d="M9 14l-5-5 5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',

@@ -111,6 +111,9 @@
   .tab[aria-selected="true"] { background: #fff; color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,.08), 0 0 0 1px rgba(15,23,42,.04); }
   .tab:focus-visible { outline-offset: -2px; }
   .scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+  .addwrap { padding: 8px 16px 0; }   /* the add field: above every view */
+  .sheet.is-full:not([data-tab="today"]) .chips.idle { display: none; }
+  .sheet.is-full:not([data-tab="today"]) .addwrap:has(.chips.idle) { padding-bottom: 10px; }   /* the example hint is for Today; Plan and Key have their own text */
   .panel { display: none; padding: 8px 16px 28px; }
   .sheet:not(.is-full) #pToday, .sheet.is-full[data-tab="today"] #pToday,
   .sheet.is-full[data-tab="tt"] #pTT, .sheet.is-full[data-tab="key"] #pKey { display: block; }
@@ -209,8 +212,8 @@
   .act.br { background: var(--accent-ink); }
   .act.del { background: var(--danger); }
   .act:focus-visible { outline: 2px solid #fff; outline-offset: -5px; }
-  .slide { position: relative; z-index: 1; background: #fff; touch-action: pan-y; display: grid; grid-template-columns: 1fr auto;
-    grid-template-areas: "t o" "r o"; column-gap: 8px; align-items: center; padding: 8px 0 8px var(--ind, 0px); }
+  .slide { position: relative; z-index: 1; background: #fff; touch-action: pan-y; display: grid; grid-template-columns: auto 1fr auto;
+    grid-template-areas: "g t o" "g r o"; column-gap: 8px; align-items: center; padding: 8px 0 8px var(--ind, 0px); }
   .trow.open .slide { transform: translateX(calc(-1 * var(--open, 152px))); }
   .tw { grid-area: t; display: flex; align-items: center; gap: 6px; min-width: 0; }
   .tw .br { flex: none; color: var(--faint); }
@@ -224,6 +227,26 @@
   .ib:hover { background: var(--fill); color: var(--text); }
   .ib[aria-expanded="true"] { background: var(--fill-2); color: var(--text); }
   .tt-foot { margin-top: 24px; display: grid; gap: 14px; }
+  .grip { grid-area: g; display: grid; place-items: center; width: 20px; height: 28px; margin: 0 -4px 0 -6px; border-radius: 6px; color: var(--faint);
+    cursor: grab; touch-action: none; transition: color var(--t) var(--ease); }
+  .trow:hover .grip { color: var(--muted); }
+
+  /* dragging a task to a new place (Today rows and Plan rows) */
+  .is-dragging { -webkit-user-select: none; user-select: none; cursor: grabbing; }
+  .is-dragging * { cursor: grabbing !important; }
+  .srow .main { -webkit-touch-callout: none; }
+  .srow.dragging, .trow.dragging { z-index: 6; background: #fff; pointer-events: none; transition: none;
+    box-shadow: 0 1px 2px rgba(15,23,42,.06), 0 10px 28px rgba(15,23,42,.16); }
+  .trow.dragging { overflow: visible; border-radius: 10px; border-bottom-color: transparent; }
+  .srow.dragging::before { display: none; }
+  .srow.drop-before::after, .srow.drop-after::after, .trow.drop-before::after, .trow.drop-after::after {
+    content: ''; position: absolute; z-index: 7; left: var(--drop-l, 0px); right: 0; height: 2px; border-radius: 2px; background: var(--accent); pointer-events: none; }
+  .srow { --drop-l: 46px; }
+  .trow { --drop-l: var(--ind, 0px); }
+  .srow.drop-before::after { top: -1px; }
+  .srow.drop-after::after { bottom: -1px; }
+  .trow.drop-before::after { top: 0; }
+  .trow.drop-after::after { bottom: 0; }
   .tt-foot .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .tt-foot .note { font-size: 13px; color: var(--muted); }
   .tt-foot label { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; }
@@ -288,7 +311,11 @@
   .undobar .undo { height: 30px; padding: 0 10px; border-radius: 7px; font-size: 13px; }
   .tabs { margin: 0 10px 6px; padding: 2px; border-radius: 8px; }
   .tab { height: 26px; border-radius: 6px; font-size: 12.5px; }
+  .addwrap { padding: 4px 12px 0; }
   .panel { padding: 4px 12px 20px; }
+  .srow { --drop-l: 34px; }
+  .grip { width: 18px; height: 24px; }
+  .grip svg { width: 14px; height: 14px; }
   .add .plus { left: 10px; top: 9px; }
   .add .plus svg { width: 16px; height: 16px; }
   .add input { height: 34px; border-radius: 8px; padding: 0 10px 0 32px; font-size: 13.5px; }

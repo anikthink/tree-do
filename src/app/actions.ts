@@ -1,6 +1,6 @@
 // What the user does to the plan: tick, move, undo, reset. Every change ends in replan(),
 // which rebuilds today's map, sends trains to whatever opened, and notifies the store (which saves).
-import { isDone, markDone, nextOrder, pruneFinished, putOffToTomorrow, removeTask, reopen, taskById } from '../domain/rules';
+import { type Where, canPlace, isDone, markDone, nextOrder, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen, taskById } from '../domain/rules';
 import { seed } from '../domain/seed';
 import { serviceDay } from '../domain/time';
 import { isPlan } from '../domain/types';
@@ -99,5 +99,15 @@ export function createActions(store: Store, app: App, rebuild: () => void) {
     } else app.refreshHud();
   }
 
-  return { replan, snapshot, undo, activate, move, resetDemo, tick };
+  /** Dragged into place: right before or after another task, in its list and on its branch. */
+  function place(id: string, targetId: string, where: Where): void {
+    const t = taskById(st.plan.tasks, id), target = taskById(st.plan.tasks, targetId);
+    if (!t || !target || !canPlace(st.plan.tasks, t, target)) return;
+    snapshot();
+    placeNear(st.plan.tasks, t, target, where);
+    replan({ instant: true });
+    app.toast('↕', `“${t.title}” moved ${where} “${target.title}”.`, true);
+  }
+
+  return { replan, snapshot, undo, activate, move, place, resetDemo, tick };
 }

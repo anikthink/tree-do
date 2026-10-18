@@ -18,7 +18,7 @@ export function installKeyboard(store: Store, dom: Dom, app: App): void {
       }
     }
     if (e.key === 'n' && !inField && !st.hold.key && !e.metaKey && !e.ctrlKey) {
-      e.preventDefault(); if (sheet.snap === 'full' && sheet.tab !== 'today') app.setTab('today'); if (sheet.snap === 'peek') app.setSnap('half'); dom.addInput.focus({ preventScroll: true });
+      e.preventDefault(); if (sheet.snap === 'peek') app.setSnap('half'); dom.scroll.scrollTop = 0; dom.addInput.focus({ preventScroll: true });
     }
   });
 }

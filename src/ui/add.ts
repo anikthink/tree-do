@@ -1,16 +1,18 @@
 // The add field: type a task in plain words, see what was understood as chips, Enter adds.
 // Branch mode: the next tasks go on a branch off a chosen task.
+// "after <task>" / "before <task>" puts it right next to that task (same list and branch, same days).
 import type { App } from '../app/context';
 import type { Store } from '../app/store';
 import { lineById } from '../domain/lines';
-import { parse, parseContext, repeatShort } from '../domain/parse';
-import { isDueToday, nextOrder, taskById } from '../domain/rules';
+import { type Parsed, parse, parseContext, repeatShort } from '../domain/parse';
+import { inheritSchedule, isDueToday, nextOrder, placeNear, taskById } from '../domain/rules';
 import { niceDate } from '../domain/time';
 import type { Task } from '../domain/types';
 import { elementOf, esc, type Dom } from './dom';
 import { icon } from './icons';
 
 const ADD_PH = 'Add a task…  e.g. stretch every day 9am';
+const WHERE_WORD = { after: 'After', before: 'Before' } as const;
 
 export function createAddField(store: Store, dom: Dom, app: App) {
   const st = store.state;
@@ -26,6 +28,15 @@ export function createAddField(store: Store, dom: Dom, app: App) {
     renderChips(); addInput.focus({ preventScroll: true }); dom.scroll.scrollTop = 0;
   }
   function clearBranch(): void { st.add.from = null; st.add.fork = null; addInput.placeholder = ADD_PH; renderChips(); }
+  /** The task as it would be added (not yet in the plan, not yet ordered). In branch mode, "after …" is ignored. */
+  function draft(p: Parsed, from: Task | undefined): { t: Task; target: Task | undefined } {
+    const target = !from && p.place ? taskById(st.plan.tasks, p.place.id) : undefined;
+    const t: Task = { id: 't' + Date.now().toString(36), line: from ? from.line : p.line, title: p.title, order: 0,
+      from: from ? from.id : null, fork: 0, repeat: p.repeat, time: p.time, date: p.date, someday: p.someday, doneOn: null, lastDone: null, skip: null };
+    if (target) { t.line = target.line; t.from = target.from; t.fork = target.fork || 0; inheritSchedule(t, target, st.today); }
+    t.anchor = p.anchor && !from && t.line === 'up';
+    return { t, target };
+  }
   function renderChips(): void {
     const v = addInput.value.trim();
     const from = branchFrom();
@@ -33,20 +44,22 @@ export function createAddField(store: Store, dom: Dom, app: App) {
     if (from) parts.push(`<span class="chip branch">${icon('branch', 14)}<span class="bt">Branch off ${esc(from.title)}</span><button type="button" data-x aria-label="Cancel branch">${icon('close', 12)}</button></span>`);
     if (!v) {
       parts.push(from ? '<span class="hint">Type the first task. Esc to cancel.</span>'
-        : '<span class="hint">Type it the way you\'d say it, e.g. <code>stretch daily 9am #health</code>.</span>');
-      chips.innerHTML = parts.join(''); return;
+        : '<span class="hint">Type it the way you\'d say it, e.g. <code>stretch daily 9am #health</code> or <code>fold clothes after laundry</code>.</span>');
+      chips.innerHTML = parts.join(''); chips.classList.toggle('idle', !from); return;
     }
+    chips.classList.remove('idle');
     const p = parse(v, parseContext(st.plan, st.today));
-    if (from) p.line = from.line;
-    const l = lineById(st.plan, p.line);
+    const { t, target } = draft(p, from);
+    const l = lineById(st.plan, t.line);
     if (!l) return;
     parts.push(`<span class="chip line" style="background:${l.tint};color:${l.text}"><span class="ldot" style="background:${l.color}"></span>${esc(l.name)}</span>`);
-    if (p.someday) parts.push(`<span class="chip">${icon('archive', 13)}Someday</span>`);
-    else if (p.repeat) parts.push(`<span class="chip">${icon('repeat', 13)}${repeatShort(p.repeat)}</span>`);
-    else parts.push(`<span class="chip">${icon('calendar', 13)}${p.date ? niceDate(p.date, st.today) : 'Today'}</span>`);
-    if (p.time) parts.push(`<span class="chip t">${p.time}</span>`);
-    if (p.anchor) parts.push('<span class="chip">Starts the day</span>');
-    parts.push(`<span class="hint">${p.lineGuess && !from ? '<code>#work</code> puts it in the Work list · ' : ''}Enter adds</span>`);
+    if (target && p.place) parts.push(`<span class="chip">${icon('corner', 13)}${WHERE_WORD[p.place.where]} ${esc(target.title)}</span>`);
+    if (t.someday) parts.push(`<span class="chip">${icon('archive', 13)}Someday</span>`);
+    else if (t.repeat) parts.push(`<span class="chip">${icon('repeat', 13)}${repeatShort(t.repeat)}</span>`);
+    else parts.push(`<span class="chip">${icon('calendar', 13)}${t.date ? niceDate(t.date, st.today) : 'Today'}</span>`);
+    if (t.time) parts.push(`<span class="chip t">${t.time}</span>`);
+    if (t.anchor) parts.push('<span class="chip">Starts the day</span>');
+    parts.push(`<span class="hint">${p.lineGuess && !from && !target ? '<code>#work</code> puts it in the Work list · ' : ''}Enter adds</span>`);
     chips.innerHTML = parts.join('');
   }
   chips.addEventListener('click', e => { if (elementOf(e.target)?.closest('[data-x]')) { addInput.value = ''; clearBranch(); addInput.focus(); } });
@@ -66,16 +79,18 @@ export function createAddField(store: Store, dom: Dom, app: App) {
       fork = st.add.fork != null ? st.add.fork : Math.max(-1, ...st.plan.tasks.filter(x => x.from === from.id).map(x => x.fork || 0)) + 1;
       st.add.fork = fork;
     }
-    const line = from ? from.line : p.line;
-    const t: Task = { id: 't' + Date.now().toString(36), line, title: p.title, order: nextOrder(st.plan.tasks),
-      from: from ? from.id : null, fork, anchor: p.anchor && !from && line === 'up', repeat: p.repeat, time: p.time, date: p.date, someday: p.someday, doneOn: null, lastDone: null, skip: null };
+    const { t, target } = draft(p, from);
+    if (from) t.fork = fork;
+    if (target && p.place) placeNear(st.plan.tasks, t, target, p.place.where);
+    else t.order = nextOrder(st.plan.tasks);
     st.plan.tasks.push(t);
     addInput.value = ''; renderChips();
     app.replan();
     const name = lineById(st.plan, t.line)?.name ?? '';
+    const where = target && p.place ? `${p.place.where} “${target.title}”` : `to ${name}`;
     if (t.someday) app.toast('+', `“${t.title}” parked for someday. It's in the plan.`, true);
-    else if (!isDueToday(t, st.today)) app.toast('+', `“${t.title}” added to ${name}. First run: ${t.date ? niceDate(t.date, st.today).toLowerCase() : 'its next day'}.`, true);
-    else { app.toast('+1', from ? `“${t.title}” added to the branch. Keep typing to extend it, Esc when done.` : `“${t.title}” added to ${name}.`, true); app.ensureVisible(t.id); }
+    else if (!isDueToday(t, st.today)) app.toast('+', `“${t.title}” added ${where}. First run: ${t.date ? niceDate(t.date, st.today).toLowerCase() : 'its next day'}.`, true);
+    else { app.toast('+1', from ? `“${t.title}” added to the branch. Keep typing to extend it, Esc when done.` : `“${t.title}” added ${where}.`, true); app.ensureVisible(t.id); }
   });
 
   return { startBranch, renderChips };

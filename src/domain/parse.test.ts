@@ -10,7 +10,7 @@ const p = (s: string) => parse(s, ctx);
 describe('plain-words parser', () => {
   it('stretch daily 9am #health', () => {
     expect(p('stretch daily 9am #health')).toEqual({
-      title: 'Stretch', line: 'l2', repeat: { type: 'daily' }, time: '09:00', date: null, someday: false, anchor: false, lineGuess: false,
+      title: 'Stretch', line: 'l2', repeat: { type: 'daily' }, time: '09:00', date: null, someday: false, anchor: false, lineGuess: false, place: null,
     });
   });
   it('call mum friday → this Friday, first list', () => {
@@ -40,6 +40,20 @@ describe('plain-words parser', () => {
     expect(p('learn piano someday')).toMatchObject({ title: 'Learn piano', someday: true });
     expect(p('pack #home').line).toBe('l3');
     expect(p('sweep #chores').line).toBe('up');
+  });
+  it('after / before <task> places it next to that task', () => {
+    expect(p('open curtains after make the bed')).toMatchObject({ title: 'Open curtains', place: { id: 't2', where: 'after' } });
+    expect(p('fold clothes right after Laundry')).toMatchObject({ title: 'Fold clothes', place: { id: 't9', where: 'after' } });
+    expect(p('drink water before take meds')).toMatchObject({ title: 'Drink water', place: { id: 't3', where: 'before' } });
+    // the task's name is taken first, so its words aren't read as a day, time or tag
+    expect(p('fold clothes after laundry every sunday 9am')).toMatchObject({ title: 'Fold clothes', repeat: { type: 'weekly', days: [0] }, time: '09:00', place: { id: 't9' } });
+    expect(p("thank sam after reply to sam's text")).toMatchObject({ title: 'Thank sam', place: { id: 't16' } });
+    expect(p('stretch after walk around the block #work')).toMatchObject({ title: 'Stretch', place: { id: 't17' } });
+  });
+  it('"after" only counts when it names a task', () => {
+    expect(p('call mum after work')).toMatchObject({ title: 'Call mum after work', place: null });
+    expect(p('afternoon nap')).toMatchObject({ title: 'Afternoon nap', place: null });
+    expect(p('rest after dishesx')).toMatchObject({ title: 'Rest after dishesx', place: null });
   });
   it('falls back to Upkeep when there are no focus lists', () => {
     const empty = parseContext({ dayStart: 4, lines: [], tasks: [] }, TODAY);

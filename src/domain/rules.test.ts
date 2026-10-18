@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasPending, isDone, isDueToday, markDone, onTodaysMap, pruneFinished, putOffToTomorrow, removeTask, reopen } from './rules';
+import { canPlace, hasPending, inheritSchedule, isDone, isDueToday, markDone, onTodaysMap, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen } from './rules';
 import { task } from './test-helpers';
 
 const MON = '2026-10-19', TUE = '2026-10-20', SAT = '2026-10-24', SUN = '2026-10-25', PREV_SUN = '2026-10-18';
@@ -94,5 +94,55 @@ describe('ticking and deleting', () => {
     removeTask(plan, b);
     expect(plan.tasks).toEqual([a, c]);
     expect([c.from, c.fork]).toEqual([a.id, 1]);
+  });
+});
+
+describe('placing a task next to another', () => {
+  const sorted = (ts: ReturnType<typeof task>[]) => [...ts].sort((a, b) => a.order - b.order).map(t => t.id);
+  it('after: joins the same list and branch, right behind it', () => {
+    const a = task({ id: 'a', line: 'l1', order: 1 }), b = task({ id: 'b', line: 'l1', order: 2, from: 'a', fork: 1 }), c = task({ id: 'c', line: 'l1', order: 3, from: 'a', fork: 1 });
+    const n = task({ id: 'n', line: 'up', order: 9 });
+    const all = [a, b, c, n];
+    placeNear(all, n, b, 'after');
+    expect(n).toMatchObject({ line: 'l1', from: 'a', fork: 1 });
+    expect(sorted(all)).toEqual(['a', 'b', 'n', 'c']);
+  });
+  it('before: takes its place and pushes it down', () => {
+    const a = task({ id: 'a', order: 1 }), b = task({ id: 'b', order: 2 }), n = task({ id: 'n', order: 3 });
+    const all = [a, b, n];
+    placeNear(all, n, a, 'before');
+    expect(sorted(all)).toEqual(['n', 'a', 'b']);
+  });
+  it('moving to another list brings its branches along', () => {
+    const a = task({ id: 'a', line: 'l1', anchor: true }), b = task({ id: 'b', line: 'l1', from: 'a' }), c = task({ id: 'c', line: 'l1', from: 'b' });
+    const home = task({ id: 'h', line: 'l3' }), other = task({ id: 'o', line: 'l1' });
+    const all = [a, b, c, home, other];
+    placeNear(all, a, home, 'after');
+    expect([a.line, b.line, c.line, other.line]).toEqual(['l3', 'l3', 'l3', 'l1']);
+    expect(a.anchor).toBe(false);
+  });
+  it("can't go next to itself or onto its own branch", () => {
+    const a = task({ id: 'a' }), b = task({ id: 'b', from: 'a' }), c = task({ id: 'c', from: 'b' }), d = task({ id: 'd' });
+    const all = [a, b, c, d];
+    expect(canPlace(all, a, a)).toBe(false);
+    expect(canPlace(all, a, c)).toBe(false);
+    expect(canPlace(all, a, d)).toBe(true);
+    expect(canPlace(all, c, a)).toBe(true);
+  });
+  it('a task with no schedule of its own runs on the same days', () => {
+    const laundry = task({ repeat: { type: 'weekly', days: [0] } });
+    const fold = task();
+    inheritSchedule(fold, laundry, MON);
+    expect(fold.repeat).toEqual({ type: 'weekly', days: [0] });
+    expect(fold.repeat).not.toBe(laundry.repeat);
+    const plants = task({ repeat: { type: 'every', n: 3 }, lastDone: PREV_SUN });
+    const mist = task();
+    inheritSchedule(mist, plants, MON);
+    expect(mist).toMatchObject({ repeat: { type: 'every', n: 3 }, lastDone: PREV_SUN });
+    const own = task({ repeat: { type: 'daily' } });
+    inheritSchedule(own, laundry, MON);
+    expect(own.repeat).toEqual({ type: 'daily' });
+    const later = task(); inheritSchedule(later, task({ date: TUE }), MON);
+    expect(later.date).toBe(TUE);
   });
 });

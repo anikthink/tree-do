@@ -1,4 +1,5 @@
 // The cross-module calls the panel, map and actions make on each other, wired by the engine.
+import type { Where } from '../domain/rules';
 import type { Snap, Tab } from './store';
 
 export type MoveKind = 'later' | 'tomorrow' | 'someday' | 'undone' | 'delete';
@@ -12,6 +13,8 @@ export interface App {
   undo(): void;
   activate(key: string): void;
   move(key: string, how: MoveKind): void;
+  /** Put a task right before or after another (its list and branch). */
+  place(id: string, targetId: string, where: Where): void;
   resetDemo(): void;
   // sheet + views
   setSnap(name: Snap, opts?: SnapOpts): void;

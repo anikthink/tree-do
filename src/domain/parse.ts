@@ -1,6 +1,7 @@
 // The plain-words parser ("stretch daily 9am #health") and the rule text shown in the plan.
 import { allLines } from './lines';
 import { DOW, DOW_LONG, addDays, diffDays, niceDate, pad2, parseYmd } from './time';
+import type { Where } from './rules';
 import type { Line, Plan, Repeat, Task } from './types';
 
 /** What the parser needs to know about the world. */
@@ -11,6 +12,8 @@ export interface ParseContext {
   defaultLine: string | null;
   /** The service day the words are relative to. */
   today: string;
+  /** Tasks that "after …" / "before …" can point at. */
+  tasks: readonly Task[];
 }
 
 export interface Parsed {
@@ -23,10 +26,36 @@ export interface Parsed {
   anchor: boolean;
   /** No `#tag` matched, so `line` is a guess. */
   lineGuess: boolean;
+  /** "after make the bed": put it right next to that task. */
+  place: { id: string; where: Where } | null;
 }
 
 export function parseContext(plan: Plan, today: string): ParseContext {
-  return { lines: allLines(plan), defaultLine: plan.lines[0] ? plan.lines[0].id : null, today };
+  return { lines: allLines(plan), defaultLine: plan.lines[0] ? plan.lines[0].id : null, today, tasks: plan.tasks };
+}
+
+const words = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/**
+ * Finds "after <task>" / "before <task>" naming an existing task ("fold clothes after dry clothes every sunday").
+ * Only counts when a task's full name follows, so "call mum after work" stays a title unless there is a task
+ * called Work. The longest name wins; live tasks beat parked or finished ones.
+ */
+function findPlace(input: string, ctx: ParseContext): { place: NonNullable<Parsed['place']>; phrase: RegExp } | null {
+  const live = (t: Task): number => (t.someday ? 0 : 2) + (!t.repeat && t.doneOn && t.doneOn < ctx.today ? 0 : 1);
+  const cands = ctx.tasks.map(t => ({ t, w: words(t.title) })).filter(c => c.w)
+    .sort((a, b) => b.w.length - a.w.length || live(b.t) - live(a.t));
+  const re = /(?:^|\s)(?:(?:right|just)\s+)?(after|before)\s+/gi;
+  for (const m of input.matchAll(re)) {
+    const rest = words(input.slice((m.index ?? 0) + m[0].length));
+    const hit = cands.find(c => rest === c.w || rest.startsWith(c.w + ' '));
+    if (!hit) continue;
+    // the phrase as typed: the keyword, then the task's words with anything non-alphanumeric between them
+    const name = hit.w.split(' ').map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^\\p{L}\\p{N}]+');
+    const phrase = new RegExp(`(?:^|\\s)(?:(?:right|just)\\s+)?${m[1]}[^\\p{L}\\p{N}]+${name}(?![\\p{L}\\p{N}])`, 'iu');
+    return { place: { id: hit.t.id, where: m[1].toLowerCase() === 'before' ? 'before' : 'after' }, phrase };
+  }
+  return null;
 }
 
 const DAYRE = '(sun|mon|tue|wed|thu|fri|sat)[a-z]*';
@@ -34,7 +63,10 @@ const dowIndex = (w: string): number => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri
 
 export function parse(input: string, ctx: ParseContext): Parsed {
   let s = ' ' + input + ' ';
-  const out: Parsed = { title: '', line: '', repeat: null, time: null, date: null, someday: false, anchor: false, lineGuess: false };
+  const out: Parsed = { title: '', line: '', repeat: null, time: null, date: null, someday: false, anchor: false, lineGuess: false, place: null };
+  // first, so the task's name can't be read as a day or time ("after sunday reset")
+  const found = findPlace(input, ctx);
+  if (found) { out.place = found.place; s = s.replace(found.phrase, ' '); }
   let line: string | null = null;
   const take = (re: RegExp, fn: (m: RegExpMatchArray) => void): boolean => {
     const m = s.match(re);

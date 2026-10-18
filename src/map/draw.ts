@@ -15,6 +15,8 @@ export type LabelRects = Record<string, [number, number, number, number] | undef
 const TICK_PTS: [number, number][] = [[-3.1, 0.2], [-0.9, 2.4], [3.3, -2.3]];
 const TICK_LEN = Math.hypot(2.2, 2.2) + Math.hypot(4.2, 4.7);
 const lineTextColor = (line: Line): string => line.text || line.color;
+/** How long ticking a task takes to fill its track in solid. */
+const FILL_MS = 450;
 
 export function createRenderer(store: Store, ctx: CanvasRenderingContext2D) {
   const st = store.state, view = st.view, cam = st.cam;
@@ -25,19 +27,32 @@ export function createRenderer(store: Store, ctx: CanvasRenderingContext2D) {
   // keep names 13–14px on screen when the whole map is zoomed out to fit
   const labelK = (): number => Math.max(1, Math.min(1.4, 0.95 / cam.s));
 
+  // Track is dashed until the task it leads to is done: grey while later, the line's colour once ready
+  // (a train paints it in as it runs). Ticking a task fills its track in solid.
   function drawEdges(now: number): void {
-    const solids: [ReturnType<typeof subPts>, string][] = [];
+    type Piece = [ReturnType<typeof subPts>, string, number];
+    const ready: Piece[] = [], solids: Piece[] = [];
     const NET = st.map;
     [...NET.edges.filter(e => e.under), ...NET.edges.filter(e => !e.under)].forEach(e => {
+      const v = vstate(st, e.to);
+      if (v === 'done' || v === 'done-ic') {
+        const pa = st.popAt[e.to];
+        const p = pa == null || st.reducedMotion ? 1 : clamp01((now - pa) / FILL_MS);
+        const s = easeOut(p) * e.len;
+        if (s < e.len) ready.push([subPts(e, s, e.len), e.color, s]);
+        if (s > 0) solids.push([subPts(e, 0, s), e.color, 0]);
+        return;
+      }
       const a = animTo(e.to);
       if (a) {
-        const p = Math.max(0, Math.min(1, (now - a.t0) / Math.max(1, a.dur)));
+        const p = clamp01((now - a.t0) / Math.max(1, a.dur));
         const s = easeIO(p) * e.len;
-        if (s < e.len) dashed(ctx, subPts(e, s, e.len));
-        if (s > 0) solids.push([subPts(e, 0, s), e.color]);
-      } else if (vstate(st, e.to) !== 'locked') solids.push([e.pts, e.color]);
+        if (s < e.len) dashed(ctx, subPts(e, s, e.len), undefined, s);
+        if (s > 0) ready.push([subPts(e, 0, s), e.color, 0]);
+      } else if (v === 'open') ready.push([e.pts, e.color, 0]);
       else dashed(ctx, e.pts);
     });
+    ready.forEach(([p, c, o]) => dashed(ctx, p, c, o));
     solids.forEach(([p, c]) => solid(ctx, p, c));
   }
   // Termini: a small rounded pill with the line's name, in its colour on a 10% tint.
@@ -45,8 +60,8 @@ export function createRenderer(store: Store, ctx: CanvasRenderingContext2D) {
     const k = labelK();
     st.map.termini.forEach(tm => {
       const l = tm.line;
-      const live = !tm.empty && vstate(st, tm.from.key) !== 'locked';
-      if (live) solid(ctx, tm.stub, l.color); else dashed(ctx, tm.stub);
+      const v = tm.empty ? 'locked' : vstate(st, tm.from.key);
+      if (v === 'done' || v === 'done-ic') solid(ctx, tm.stub, l.color); else dashed(ctx, tm.stub);
       if (tm.branch) return;
       const end = tm.stub[tm.stub.length - 1];
       setFont(ctx, 600, 11.5 * k, 'Figtree');

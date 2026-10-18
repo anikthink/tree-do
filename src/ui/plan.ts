@@ -1,12 +1,14 @@
-// The Plan tab (timetable): every list and rule, editable in plain words. Rows swipe left for Branch / Delete.
+// The Plan tab (timetable): every list and rule, editable in plain words. Rows swipe left for Branch / Delete,
+// and drag by their grip to another place (any list, any branch).
 import type { App } from '../app/context';
 import type { Store } from '../app/store';
 import { MAX_FOCUS, allLines } from '../domain/lines';
 import { parse, parseContext, ruleSource, ruleText } from '../domain/parse';
-import { removeTask, taskById } from '../domain/rules';
+import { canPlace, removeTask, taskById } from '../domain/rules';
 import { pad2 } from '../domain/time';
 import type { Task } from '../domain/types';
 import { closestEl, elementOf, esc, type Dom } from './dom';
+import { installDrag } from './drag';
 import { icon } from './icons';
 
 export function createPlanView(store: Store, dom: Dom, app: App) {
@@ -20,11 +22,12 @@ export function createPlanView(store: Store, dom: Dom, app: App) {
     else dom.tabTT.focus();
   }
   function renderTimetable(): void {
+    if (drag.busy()) return;
     const plan = st.plan, lines = allLines(plan);
     const parts: string[] = [];
     parts.push(`<p class="tt-intro">The map only shows today. This is the plan it's built from. Edit a rule in plain words:
       <code>every day 8am</code>, <code>first thing</code>, <code>weekdays</code>, <code>every 3 days</code>, <code>every mon and thu</code>, <code>tomorrow</code>, <code>on friday 14:00</code>, <code>someday</code>, <code>once</code>.
-      Swipe a task left to branch or delete.</p>`);
+      Drag a task by its grip to move it. Swipe it left to branch or delete.</p>`);
     lines.forEach(l => {
       const pool = plan.tasks.filter(t => t.line === l.id && !t.someday);
       const ids = new Set(pool.map(t => t.id));
@@ -59,9 +62,9 @@ export function createPlanView(store: Store, dom: Dom, app: App) {
       ? `<button class="ib" type="button" data-act="today" title="Bring back to today" aria-label="Bring ${esc(t.title)} back to today">${icon('back', 17)}</button>`
       : `<button class="ib" type="button" data-act="up" title="Earlier in the list" aria-label="Move ${esc(t.title)} earlier">${icon('up', 17)}</button>
          <button class="ib" type="button" data-act="down" title="Later in the list" aria-label="Move ${esc(t.title)} later">${icon('down', 17)}</button>`;
-    return `<div class="trow" data-id="${t.id}" style="--open:${t.someday ? 76 : 152}px">
+    return `<div class="trow" data-id="${t.id}" style="--open:${t.someday ? 76 : 152}px;--ind:${d * 18}px">
       <div class="acts">${t.someday ? '' : `<button class="act br" type="button" data-act="branch" aria-label="Start a branch off ${esc(t.title)}">Branch</button>`}<button class="act del" type="button" data-act="del" aria-label="Delete ${esc(t.title)}">Delete</button></div>
-      <div class="slide" style="--ind:${d * 18}px">
+      <div class="slide">${t.someday ? '' : `<span class="grip" title="Drag to move">${icon('grip', 16)}</span>`}
         <span class="tw">${d ? `<span class="br">${icon('corner', 15)}</span>` : ''}<input class="title" value="${esc(t.title)}" aria-label="Task name${d ? ', on a branch' : ''}"></span>
         <input class="rule" value="${esc(ruleText(t, st.today))}" data-src="${esc(ruleSource(t, st.today))}" aria-label="When (type in plain words)">
         <span class="ops">${ops}<button class="ib" type="button" data-act="more" aria-expanded="false" title="Branch or delete (or swipe left)" aria-label="More actions for ${esc(t.title)}">${icon('more', 18)}</button></span>
@@ -167,7 +170,7 @@ export function createPlanView(store: Store, dom: Dom, app: App) {
   let swipeClick = false;
   const openWidth = (row: HTMLElement): number => parseFloat(getComputedStyle(row).getPropertyValue('--open'));
   ttBody.addEventListener('pointerdown', e => {
-    const slide = closestEl(e.target, '.slide'); if (!slide || e.button !== 0) return;
+    const slide = closestEl(e.target, '.slide'); if (!slide || e.button !== 0 || closestEl(e.target, '.grip')) return;
     const row = closestEl(slide, '.trow'); if (!row) return;
     sw = { slide, row, id: e.pointerId, x: e.clientX, y: e.clientY, base: row.classList.contains('open') ? -openWidth(row) : 0, dir: null, dx: 0 };
   });
@@ -204,6 +207,20 @@ export function createPlanView(store: Store, dom: Dom, app: App) {
   ttBody.addEventListener('pointerup', endSwipe);
   ttBody.addEventListener('pointercancel', endSwipe);
   ttBody.addEventListener('dragstart', e => { if (sw && sw.dir) e.preventDefault(); });
+
+  // drag by the grip: drop it next to any task in any list (not onto its own branch)
+  const drag = installDrag({
+    root: ttBody, scroller: dom.scroll, handle: '.grip', grip: true, row: '.trow',
+    idOf: row => row.dataset.id,
+    targets: id => {
+      const t = taskById(st.plan.tasks, id);
+      return [...ttBody.querySelectorAll<HTMLElement>('.tline[data-line] .trow[data-id]')].filter(r => {
+        const target = r.dataset.id ? taskById(st.plan.tasks, r.dataset.id) : undefined;
+        return !!t && !!target && canPlace(st.plan.tasks, t, target);
+      });
+    },
+    drop: (id, targetId, where) => app.place(id, targetId, where),
+  });
 
   return { ttOpen, openTimetable, renderTimetable };
 }

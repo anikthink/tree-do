@@ -56,7 +56,8 @@ export function startTreeDo(): void {
 
   const app: App = {
     replan: o => actions.replan(o), snapshot: () => actions.snapshot(), undo: () => actions.undo(),
-    activate: k => actions.activate(k), move: (k, how) => actions.move(k, how), resetDemo: () => actions.resetDemo(),
+    activate: k => actions.activate(k), move: (k, how) => actions.move(k, how), place: (id, to, w) => actions.place(id, to, w),
+    resetDemo: () => actions.resetDemo(),
     setSnap: (n, o) => sheet.setSnap(n, o), setTab: t => views.setTab(t), applyH: h => sheet.applyH(h),
     sheetH: () => sheet.sheetH(), sheetExpanded: () => sheet.sheetExpanded(),
     refreshHud: () => today.refreshHud(), renderList: () => a11y.renderList(), renderLegend: () => key.renderLegend(),

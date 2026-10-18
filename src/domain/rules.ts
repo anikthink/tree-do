@@ -68,3 +68,42 @@ export function putOffToTomorrow(t: Task, today: string): void {
   else t.date = addDays(today, 1);
 }
 export const nextOrder = (tasks: readonly Task[]): number => Math.max(0, ...tasks.map(x => x.order)) + 1;
+
+export type Where = 'before' | 'after';
+
+/** Is `t` the task `ancestorId`, or somewhere on a branch hanging off it? */
+export function isWithin(tasks: readonly Task[], t: Task, ancestorId: string): boolean {
+  let cur: Task | undefined = t, guard = 0;
+  while (cur && guard++ < 100) {
+    if (cur.id === ancestorId) return true;
+    cur = cur.from ? taskById(tasks, cur.from) : undefined;
+  }
+  return false;
+}
+
+/** Can `t` move next to `target`? Not next to itself, and not onto one of its own branches. */
+export const canPlace = (tasks: readonly Task[], t: Task, target: Task): boolean => target !== t && !isWithin(tasks, target, t.id);
+
+/** A task placed next to another, with no schedule of its own, runs on the same days. */
+export function inheritSchedule(t: Task, target: Task, today: string): void {
+  if (t.repeat || t.date || t.someday) return;
+  t.someday = target.someday;
+  if (target.repeat) {
+    t.repeat = structuredClone(target.repeat);
+    if (target.repeat.type === 'every') t.lastDone = target.lastDone;   // keep "every N days" in step
+  } else if (target.date && target.date > today) t.date = target.date;
+}
+
+/**
+ * Put `t` right before or after `target`, in the same list and on the same branch.
+ * Orders are one global counter, so everything from the slot onwards shifts down by one.
+ * Branches off `t` move with it, even to another list.
+ */
+export function placeNear(tasks: readonly Task[], t: Task, target: Task, where: Where): void {
+  if (t.line !== target.line) tasks.forEach(x => { if (x !== t && isWithin(tasks, x, t.id)) x.line = target.line; });   // its branches come along
+  t.line = target.line; t.from = target.from; t.fork = target.fork || 0;
+  if (t.anchor && t.line !== 'up') t.anchor = false;   // only Upkeep starts the day
+  const at = where === 'after' ? target.order + 1 : target.order;
+  tasks.forEach(x => { if (x !== t && x.order >= at) x.order++; });
+  t.order = at;
+}

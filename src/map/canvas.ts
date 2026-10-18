@@ -13,16 +13,22 @@ export function strokePts(ctx: CanvasRenderingContext2D, pts: Pt[]): void {
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
   ctx.stroke();
 }
-/** Painted track: the line's colour on a white casing. */
+/** Travelled track (the task it leads to is done): the line's colour on a white casing. */
 export function solid(ctx: CanvasRenderingContext2D, pts: Pt[], color: string): void {
   ctx.setLineDash([]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 9; strokePts(ctx, pts);
   ctx.strokeStyle = color; ctx.lineWidth = 5; strokePts(ctx, pts);
 }
-/** Planned track: a thin, quiet grey line. */
-export function dashed(ctx: CanvasRenderingContext2D, pts: Pt[]): void {
-  ctx.setLineDash([]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#D5D9E0'; ctx.lineWidth = 2; strokePts(ctx, pts);
+/**
+ * Track to a task that isn't done yet: dashed. Grey and thin while it's later; in the line's colour once it's ready.
+ * `offset` is how far along the edge `pts` starts, so dashes line up across pieces of one edge.
+ */
+export function dashed(ctx: CanvasRenderingContext2D, pts: Pt[], color?: string, offset = 0): void {
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineDashOffset = offset;
+  if (color) { ctx.setLineDash([6, 8]); ctx.strokeStyle = color; ctx.lineWidth = 3.5; }
+  else { ctx.setLineDash([3, 7]); ctx.strokeStyle = '#C5CBD3'; ctx.lineWidth = 2; }
+  strokePts(ctx, pts);
+  ctx.setLineDash([]); ctx.lineDashOffset = 0;
 }
 export function setFont(ctx: CanvasRenderingContext2D, weight: number, size: number, family: string): void {
   ctx.font = `${weight} ${size}px ${family}`;
