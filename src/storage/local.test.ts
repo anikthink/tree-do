@@ -10,7 +10,11 @@ describe('local storage', () => {
   });
 
   it('round-trips a saved plan', () => {
-    const plan = { dayStart: 4, lines: [{ id: 'l1', name: 'Work' }], tasks: [{ id: 't1', title: 'Get up' }] };
+    const plan = {
+      dayStart: 4,
+      lines: [{ id: 'l1', code: 'L1', name: 'Work', pal: 0 }],
+      tasks: [{ id: 't1', line: 'up', title: 'Get up', order: 1, from: null, fork: 0, repeat: { type: 'daily' as const }, time: null, date: null, someday: false, doneOn: null, lastDone: null, skip: null }],
+    };
     saveState(plan);
     expect(loadState()).toEqual(plan);
   });

@@ -29,19 +29,58 @@ Tip: add `?now=2026-10-19T07:40` to the URL to pretend it's a different time (us
 ## Where things are
 
 ```
-index.html            page shell + fonts
-src/main.tsx          React entry
-src/App.tsx           mounts the app shell and starts the engine
-src/app/shell.html    the panel, map canvas and controls (markup)
-src/app/engine.ts     map layout + drawing, day rules, parser, panel behaviour
-src/storage/local.ts  saving (browser localStorage for now)
-src/styles.css        the Calm design
+index.html               page shell + fonts
+src/main.tsx             React entry
+src/App.tsx              mounts the app shell and starts the engine
+src/app/shell.html       the panel, map canvas and controls (markup)
+src/app/engine.ts        composition root: loads the plan, wires the modules, runs the frame loop
+src/app/store.ts         the one typed app state + change/notify (saving subscribes to plan changes)
+src/app/actions.ts       tick, move, undo, reset, replan (every plan change goes through here)
+src/app/context.ts       the cross-module calls (App interface) the engine wires up
+src/app/viewport.ts      breakpoints and sizes shared by map and panel
+
+src/domain/              pure, unit-tested; no DOM
+  types.ts               Task, List ("line"), Repeat, Plan (= saved state)
+  time.ts                clock (incl. ?now=), dates, service day (4am start), friendly dates
+  rules.ts               what's due today, done, carry-over / pruning, skip
+  parse.ts               plain-words parser, rule text
+  lines.ts               lists and their colours
+  network.ts             today's network: what's on the map, branches, junction, task states
+  seed.ts                the sample day
+
+src/map/                 the canvas map
+  layout.ts              desktop rows / phone columns
+  geometry.ts            track geometry
+  draw.ts, canvas.ts     drawing
+  status.ts              how a station reads (ready / later / done, countdown, meta)
+  trains.ts              trains and arrival rings
+  camera.ts              fitting, panning limits, easing
+  input.ts               tap / hold / drag / pinch / wheel, zoom buttons
+
+src/ui/                  the panel
+  sheet.ts               snap points, spring, pinned panel
+  views.ts               Today / Plan / Key tabs
+  today.ts               header count, next-up row, Ready now / Later / Done
+  add.ts                 add field, chips, branch mode
+  plan.ts                the Plan tab (timetable)
+  key.ts                 the Key tab
+  hold.ts                hold menu
+  notice.ts              notice / undo bar, live region
+  a11y.ts                hidden keyboard / screen-reader task list
+  keyboard.ts            global keys (Esc, N)
+  dom.ts, icons.ts, format.ts   element lookup, icons, meta HTML
+
+src/storage/local.ts     saving (browser localStorage under `tree-do:v1`)
+src/styles.css           the Calm design
 ```
 
 ## Status
 
-- **Phase 1 (this):** runs locally and saves in the browser. The engine is carried over unchanged from the design prototype.
+- **Phase 1 (this):** runs locally and saves in the browser. The prototype engine is split into typed `domain/`, `map/` and `ui/` modules with the same behaviour and look.
 - **Next:**
-  - split the engine into typed `domain/`, `map/` and `ui/` modules;
-  - store data in Convex, with sign-in and sync across devices;
+  - store data in Convex (subscribe to the store's `plan` changes, as `engine.ts` does for localStorage), with sign-in and sync across devices;
   - deploy on Vercel.
+
+## License
+
+[AGPL-3.0](LICENSE). You're free to use, study, change and share Tree-do. If you run a modified version as a service for others, you must make your source available under the same license.
