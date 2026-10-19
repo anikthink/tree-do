@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canPlace, editTask, hasPending, inheritSchedule, isDone, isDueToday, markDone, onTodaysMap, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen } from './rules';
+import { canPlace, editTask, hasPending, retime, inheritSchedule, isDone, isDueToday, markDone, onTodaysMap, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen } from './rules';
 import { task } from './test-helpers';
 
 const MON = '2026-10-19', TUE = '2026-10-20', SAT = '2026-10-24', SUN = '2026-10-25', PREV_SUN = '2026-10-18';
@@ -148,7 +148,7 @@ describe('placing a task next to another', () => {
 });
 
 describe('editing a task (the week\'s editor)', () => {
-  const base = { title: 'Call mum', line: 'up', time: null, date: null, repeat: null };
+  const base = { title: 'Call mum', line: 'up', time: null, duration: null, date: null, repeat: null };
   it('renames, retimes and reschedules a one-off', () => {
     const t = task({ title: 'Call' });
     editTask([t], t, { ...base, time: '15:00', date: SAT }, MON);
@@ -169,5 +169,20 @@ describe('editing a task (the week\'s editor)', () => {
     editTask([a, b, c, other], b, { ...base, line: 'l2' }, MON);
     expect([b.line, b.from, c.line, c.from]).toEqual(['l2', null, 'l2', b.id]);
     expect(b.order).toBeGreaterThan(other.order);
+  });
+});
+
+describe('retime (dragging on the week)', () => {
+  it('a one-off moves to the new day and time', () => {
+    const t = task({ time: '09:00', date: SAT });
+    retime(t, '14:15', 45, SUN, MON);
+    expect([t.time, t.duration, t.date]).toEqual(['14:15', 45, SUN]);
+    retime(t, '10:00', 30, MON, MON);
+    expect(t.date).toBeNull();
+  });
+  it('a repeat keeps its days', () => {
+    const t = task({ time: '09:00', repeat: { type: 'weekdays' } });
+    retime(t, '07:30', 15, SAT, MON);
+    expect([t.time, t.duration, t.date, t.repeat]).toEqual(['07:30', 15, null, { type: 'weekdays' }]);
   });
 });

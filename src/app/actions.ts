@@ -2,9 +2,9 @@
 // which rebuilds today's map, sends trains to whatever opened, and notifies the store (which saves).
 import { lineById } from '../domain/lines';
 import { parse, parseContext, repeatShort } from '../domain/parse';
-import { type TaskEdit, type Where, canPlace, editTask, inheritSchedule, isDone, markDone, nextOrder, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen, taskById } from '../domain/rules';
+import { type TaskEdit, type Where, canPlace, editTask, retime, inheritSchedule, isDone, markDone, nextOrder, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen, taskById } from '../domain/rules';
 import { seed } from '../domain/seed';
-import { niceDate, serviceDay } from '../domain/time';
+import { niceDate, serviceDay, timeRange } from '../domain/time';
 import { type Task, isPlan } from '../domain/types';
 import { type Slot, logDone, pruneHistory, slotSchedule, unlogDone } from '../domain/week';
 import { dispatchTrains, seedArrived } from '../map/trains';
@@ -120,17 +120,17 @@ export function createActions(store: Store, app: App, rebuild: () => void) {
     const p = parse(text, parseContext(st.plan, st.today));
     if (!p.title) return null;
     snapshot();
-    const { date, time } = slotSchedule(p, slot, st.today);
+    const { date, time, duration } = slotSchedule(p, slot, st.today);
     const target = p.place ? taskById(st.plan.tasks, p.place.id) : undefined;
     const t: Task = { id: 't' + Date.now().toString(36), line: p.lineGuess && line && lineById(st.plan, line) ? line : p.line, title: p.title, order: 0,
-      from: null, fork: 0, repeat: p.repeat, time, date, someday: p.someday, doneOn: null, lastDone: null, skip: null };
+      from: null, fork: 0, repeat: p.repeat, time, duration, date, someday: p.someday, doneOn: null, lastDone: null, skip: null };
     t.anchor = p.anchor && t.line === 'up';
     if (target && p.place) { t.line = target.line; t.from = target.from; t.fork = target.fork || 0; inheritSchedule(t, target, st.today); placeNear(st.plan.tasks, t, target, p.place.where); }
     else t.order = nextOrder(st.plan.tasks);
     st.plan.tasks.push(t);
     replan();
     const when = t.someday ? 'for someday' : t.repeat ? repeatShort(t.repeat).toLowerCase() : niceDate(t.date ?? st.today, st.today).replace(/^(Today|Tomorrow)$/, m => m.toLowerCase());
-    app.toast('+', `“${t.title}” added to ${lineById(st.plan, t.line)?.name ?? 'its list'}, ${when}${t.time ? ' at ' + t.time : ''}.`, true);
+    app.toast('+', `“${t.title}” added to ${lineById(st.plan, t.line)?.name ?? 'its list'}, ${when}${t.time ? ' at ' + timeRange(t.time, t.duration) : ''}.`, true);
     return t;
   }
 
@@ -143,5 +143,15 @@ export function createActions(store: Store, app: App, rebuild: () => void) {
     app.toast('✓', `“${t.title}” updated.`, true);
   }
 
-  return { replan, snapshot, undo, activate, move, place, resetDemo, tick, addAt, edit };
+  /** Dragged on the week's grid: moved or stretched. A repeat keeps its days (only its time changes). */
+  function reschedule(id: string, day: string, time: string, duration: number): void {
+    const t = taskById(st.plan.tasks, id); if (!t) return;
+    snapshot();
+    retime(t, time, duration, day, st.today);
+    replan({ instant: true });
+    const when = t.repeat ? repeatShort(t.repeat).toLowerCase() : niceDate(t.date ?? st.today, st.today).replace(/^(Today|Tomorrow)$/, m => m.toLowerCase());
+    app.toast('→', `“${t.title}” now ${when}, ${timeRange(time, duration)}.`, true);
+  }
+
+  return { replan, snapshot, undo, activate, move, place, resetDemo, tick, addAt, edit, reschedule };
 }

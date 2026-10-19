@@ -10,7 +10,7 @@ const p = (s: string) => parse(s, ctx);
 describe('plain-words parser', () => {
   it('stretch daily 9am #health', () => {
     expect(p('stretch daily 9am #health')).toEqual({
-      title: 'Stretch', line: 'l2', repeat: { type: 'daily' }, time: '09:00', date: null, someday: false, anchor: false, lineGuess: false, place: null,
+      title: 'Stretch', line: 'l2', repeat: { type: 'daily' }, time: '09:00', duration: null, date: null, someday: false, anchor: false, lineGuess: false, place: null,
     });
   });
   it('call mum friday → this Friday, first list', () => {
@@ -79,5 +79,33 @@ describe('rule text', () => {
     expect(ruleSource(later, TODAY)).toBe('on friday');
     expect(parse('x on friday', ctx).date).toBe('2026-10-23');
     expect(ruleText(task({ doneOn: TODAY }), TODAY)).toBe('Once · Done');
+  });
+});
+
+describe('start and end', () => {
+  it('reads a range as a start time and a length', () => {
+    expect(p('gym 3-5pm')).toMatchObject({ title: 'Gym', time: '15:00', duration: 120 });
+    expect(p('lunch with sam 11-1pm')).toMatchObject({ title: 'Lunch with sam', time: '11:00', duration: 120 });
+    expect(p('focus 9am to 11')).toMatchObject({ title: 'Focus', time: '09:00', duration: 120 });
+    expect(p('workshop 14:00–16:30 friday')).toMatchObject({ title: 'Workshop', time: '14:00', duration: 150, date: '2026-10-23' });
+    expect(p('call 9:15-9:30am')).toMatchObject({ time: '09:15', duration: 15 });
+  });
+  it('reads a length', () => {
+    expect(p('call mum 3pm for 45 min')).toMatchObject({ title: 'Call mum', time: '15:00', duration: 45 });
+    expect(p('deep work for 2h')).toMatchObject({ title: 'Deep work', time: null, duration: 120 });
+    expect(p('read for 1h 30m 9pm')).toMatchObject({ title: 'Read', time: '21:00', duration: 90 });
+    expect(p('walk for half an hour').duration).toBe(30);
+    expect(p('nap for an hour').duration).toBe(60);
+    expect(p('gym 6pm for 1.5h').duration).toBe(90);
+  });
+  it('leaves numbers that are not times alone', () => {
+    expect(p('get 3-4 boxes')).toMatchObject({ title: 'Get 3-4 boxes', time: null, duration: null });
+  });
+  it('round-trips through the plan\'s rule text', () => {
+    const t = task({ time: '14:00', duration: 150, repeat: { type: 'daily' } });
+    expect(ruleText(t, TODAY)).toBe('Daily · 14:00–16:30');
+    expect(p('x ' + ruleSource(t, TODAY))).toMatchObject({ time: '14:00', duration: 150, repeat: { type: 'daily' } });
+    const len = task({ duration: 45 });
+    expect(p('x ' + ruleSource(len, TODAY)).duration).toBe(45);
   });
 });

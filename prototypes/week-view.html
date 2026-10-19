@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree-do · Week view, five directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* Tree-do · Calm tokens (src/styles.css) */
+  :root {
+    --text:#1C2430; --text-2:#3F4856; --muted:#6B7480; --faint:#B4BBC5; --hair:#E8EAEE; --hair-2:#F0F2F5;
+    --fill:#F4F6F9; --fill-2:#ECEFF3; --lock:#C5CBD3;
+    --accent:#2F7CF6; --accent-ink:#1F62D0; --accent-tint:#EAF2FF;
+    --r-sm:8px; --r:12px; --r-lg:14px;
+    --e1:0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.08);
+    --ease:cubic-bezier(.22,.8,.3,1); --t:220ms;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--fill); color: var(--text); font-family: 'Figtree', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .mono { font-family: 'Geist Mono', monospace; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .ldot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--c); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ---------- canvas ---------- */
+  .page { max-width: 1260px; margin: 0 auto; padding: 48px 30px 96px; }
+  .intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+  .intro h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; }
+  .intro p { color: var(--muted); font-size: 15px; line-height: 1.5; margin-top: 6px; max-width: 620px; }
+  .jump { display: flex; gap: 4px; padding: 3px; background: #fff; border: 1px solid var(--hair); border-radius: 10px; }
+  .jump a { height: 32px; padding: 0 12px; border-radius: 8px; display: grid; place-items: center; font-size: 14px; font-weight: 500;
+    color: var(--muted); text-decoration: none; transition: background var(--t) var(--ease), color var(--t) var(--ease); }
+  .jump a:hover { background: var(--fill); color: var(--text); }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 22px; font-size: 13px; color: var(--muted); align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .opt { margin-top: 64px; scroll-margin-top: 24px; }
+  .opt-head { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; align-items: baseline; margin-bottom: 16px; }
+  .opt-head h2 { font-size: 20px; font-weight: 700; }
+  .opt-head h2 small { font-size: 14px; font-weight: 500; color: var(--muted); margin-right: 8px; }
+  .opt-head p { grid-column: 1; color: var(--text-2); font-size: 14.5px; line-height: 1.5; max-width: 720px; }
+  .opt-head dl { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: auto auto; gap: 3px 12px; font-size: 13px; align-self: end; }
+  .opt-head dt { color: var(--muted); }
+  .opt-head dd { color: var(--text-2); font-weight: 500; }
+  .wrap { overflow-x: auto; border-radius: 16px; }
+  .frame { width: 1200px; background: #fff; border: 1px solid var(--hair); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  .bar { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--hair); }
+  .bar .ttl { font-weight: 600; font-size: 15px; }
+  .bar .rng { font-size: 12.5px; color: var(--muted); }
+  .bar .cnt { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+  .bar .cnt b { color: var(--text); font-weight: 500; }
+  .seg { display: flex; gap: 2px; padding: 3px; background: var(--fill); border-radius: 10px; margin-left: 12px; }
+  .seg span { height: 28px; padding: 0 12px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; font-weight: 500; color: var(--muted); }
+  .seg span.on { background: #fff; color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,.08), 0 0 0 1px rgba(15,23,42,.04); }
+
+  /* the station mark, shared: done = filled, ready = ring in the list's colour, later = dashed grey */
+  .st { --s: 12px; flex: none; width: var(--s); height: var(--s); border-radius: 50%; border: 2px solid var(--c); background: #fff; display: grid; place-items: center;
+    transition: background var(--t) var(--ease), border-color var(--t) var(--ease), transform var(--t) var(--ease); }
+  .st svg { width: 70%; height: 70%; overflow: visible; }
+  .st path { fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 16; stroke-dashoffset: 16; transition: stroke-dashoffset 240ms var(--ease) 60ms; }
+  .s-done .st { background: var(--c); }
+  .s-done .st path { stroke-dashoffset: 0; }
+  .s-later .st, .s-someday .st { border-style: dashed; border-color: var(--lock); }
+  .s-missed .st { border-style: dashed; border-color: var(--hair); }
+  .pop .st { animation: tick 320ms var(--ease); }
+  @keyframes tick { 0% { transform: scale(.8); } 55% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  [data-tick] { cursor: pointer; }
+  [data-tick]:hover .st { box-shadow: 0 0 0 4px var(--tint); }
+  .s-done .tt { color: var(--muted); }
+  .s-later .tt, .s-someday .tt { color: var(--text-2); }
+  .s-missed .tt { color: var(--faint); }
+
+  /* ================= 1 · Lines ================= */
+  .d1 { display: grid; grid-template-columns: 158px repeat(7, 1fr); }
+  .d1-h { height: 52px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--hair); font-size: 13px; color: var(--muted); font-weight: 500; }
+  .d1-h b { font-family: 'Geist Mono', monospace; font-weight: 400; color: var(--text); font-size: 13px; }
+  .d1-h.today { background: var(--fill); color: var(--text); font-weight: 600; }
+  .d1-h.today em { font-style: normal; margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--accent-ink); background: var(--accent-tint); padding: 2px 7px; border-radius: 6px; }
+  .d1-row { display: contents; }
+  .d1-name { padding: 16px 14px 18px; border-bottom: 1px solid var(--hair-2); transition: opacity var(--t) var(--ease); }
+  .d1-name .n { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14.5px; }
+  .d1-name .k { font-size: 12px; color: var(--muted); margin-top: 4px; padding-left: 16px; }
+  .d1-cell { position: relative; padding: 40px 10px 16px; border-bottom: 1px solid var(--hair-2); min-width: 0; transition: opacity var(--t) var(--ease); }
+  .d1-cell.today { background: var(--fill); }
+  .d1-cell .a, .d1-cell .b { position: absolute; top: 19px; height: 0; border-top: 4px solid var(--c); }
+  .d1-cell .a { left: 0; right: 50%; } .d1-cell .b { left: 50%; right: 0; }
+  .d1-cell .dash { border-top-style: dashed; }
+  .d1-cell .grey { border-top-color: var(--lock); }
+  .d1-stop { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid var(--c); }
+  .d1-stop.full { background: var(--c); }
+  .d1-stop.part { background: conic-gradient(var(--c) var(--p), #fff 0); }
+  .d1-stop.later { border-color: var(--lock); border-style: dashed; }
+  .d1-stop + .mono { position: absolute; top: 12px; left: calc(50% + 13px); padding: 0 4px; font-size: 11.5px; color: var(--muted); background: #fff; }
+  .d1-cell.today .d1-stop + .mono { background: var(--fill); }
+  .d1-it { display: flex; align-items: flex-start; gap: 7px; width: 100%; text-align: left; padding: 4px 4px; border-radius: 6px; font-size: 12.5px; line-height: 1.3; font-weight: 500;
+    transition: background var(--t) var(--ease); }
+  .d1-it:hover { background: rgba(15,23,42,.04); }
+  .d1-it .st { --s: 11px; margin-top: 2px; border-width: 1.6px; }
+  .d1-it .tm { font-size: 11px; color: var(--muted); margin-right: 3px; }
+  .d1-it.br { padding-left: 14px; }
+  .d1-ghost { display: flex; gap: 6px; padding: 4px; font-size: 12px; color: var(--faint); line-height: 1.3; }
+  .d1:has(.d1-row:hover) .d1-row:not(:hover) > * { opacity: .32; }
+
+  /* ================= 2 · Hours ================= */
+  .d2 { --hh: 48px; }
+  .d2-cols { display: grid; grid-template-columns: 64px repeat(7, 1fr); }
+  .d2-h { height: 56px; padding: 8px 12px; border-bottom: 1px solid var(--hair); border-left: 1px solid var(--hair-2); }
+  .d2-h:first-child { border-left: 0; }
+  .d2-h span { display: block; font-size: 12px; color: var(--muted); font-weight: 500; }
+  .d2-h b { font-family: 'Geist Mono', monospace; font-weight: 400; font-size: 20px; line-height: 1.2; }
+  .d2-h.today b { display: inline-grid; place-items: center; min-width: 32px; height: 26px; padding: 0 6px; border-radius: 8px; background: var(--text); color: #fff; font-size: 16px; }
+  .d2-h.past b { color: var(--muted); }
+  .d2-tray { border-bottom: 1px solid var(--hair); }
+  .d2-tlabel { padding: 10px 8px 0 12px; font-size: 11.5px; color: var(--muted); font-weight: 500; }
+  .d2-tlabel button { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; color: var(--muted); font-size: 11.5px; font-weight: 500; }
+  .d2-tlabel button:hover { color: var(--text); }
+  .d2-tlabel svg { transition: transform var(--t) var(--ease); }
+  .open .d2-tlabel svg { transform: rotate(180deg); }
+  .d2-tc { padding: 8px 6px 10px; border-left: 1px solid var(--hair-2); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .d2-tc.past { background: #FBFBFC; }
+  .d2-chip { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--r-sm); background: var(--tint); color: var(--tx); font-size: 12px; font-weight: 600; min-width: 0; }
+  .d2-chip .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .d2-chip .mono { font-size: 11px; font-weight: 400; }
+  .d2-chip.done { background: var(--fill); color: var(--muted); }
+  .d2-chip.later { background: #fff; box-shadow: inset 0 0 0 1px var(--hair); color: var(--text-2); }
+  .d2-list { display: none; padding: 0 0 4px 4px; }
+  .open .d2-list { display: block; }
+  .d2-li { display: flex; align-items: flex-start; gap: 6px; width: 100%; text-align: left; font-size: 12px; font-weight: 500; line-height: 1.3; padding: 3px 2px; border-radius: 5px; }
+  .d2-li .st { --s: 10px; border-width: 1.5px; margin-top: 2px; }
+  .d2-li:hover { background: rgba(15,23,42,.04); }
+  .d2-scroll { position: relative; }
+  .d2-grid { position: relative; display: grid; grid-template-columns: 64px repeat(7, 1fr); height: calc(var(--hh) * 15); }
+  .d2-gut { position: relative; }
+  .d2-gut span { position: absolute; right: 10px; transform: translateY(-50%); font-size: 11px; color: var(--muted); }
+  .d2-col { position: relative; border-left: 1px solid var(--hair-2);
+    background-image: repeating-linear-gradient(to bottom, var(--hair-2) 0 1px, transparent 1px var(--hh)); }
+  .d2-col.past { background-color: #FBFBFC; }
+  .d2-ev { position: absolute; left: 5px; right: 5px; height: 44px; padding: 6px 8px 6px 28px; border-radius: 9px; text-align: left; background: var(--tint);
+    font-size: 12.5px; font-weight: 600; color: var(--tx); line-height: 1.25; animation: fade 380ms var(--ease) both; animation-delay: calc(var(--i) * 30ms);
+    transition: background var(--t) var(--ease), box-shadow var(--t) var(--ease); }
+  .d2-ev .st { position: absolute; left: 8px; top: 8px; }
+  .d2-ev .tt { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .d2-ev .tm { display: block; font-size: 11px; font-weight: 400; color: var(--muted); margin-top: 1px; }
+  .d2-ev.s-done { background: var(--fill); }
+  .d2-ev.s-done .tt { text-decoration: none; }
+  .d2-ev.s-later { background: #fff; box-shadow: inset 0 0 0 1px var(--hair); }
+  .d2-ev.s-missed { background: #fff; box-shadow: inset 0 0 0 1px var(--hair-2); }
+  .d2-ev:hover { box-shadow: inset 0 0 0 1px var(--c), var(--e1); }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .d2-now { position: absolute; left: -1px; right: 0; height: 2px; background: var(--text); z-index: 2; pointer-events: none; }
+  .d2-now::before { content: ''; position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--text); }
+  .d2-nowlbl { position: absolute; right: 6px; transform: translateY(-50%); z-index: 2; font-size: 11px; color: #fff; background: var(--text); padding: 1px 5px; border-radius: 5px; }
+
+  /* ================= 3 · Days ================= */
+  .d3-day { border-bottom: 1px solid var(--hair-2); }
+  .d3-day:last-child { border-bottom: 0; }
+  .d3-sum { display: grid; grid-template-columns: 96px 1fr auto 28px; align-items: center; gap: 18px; width: 100%; min-height: 64px; padding: 0 20px; text-align: left;
+    transition: background var(--t) var(--ease); }
+  .d3-sum:hover { background: #F8F9FB; }
+  .d3-date { display: flex; align-items: baseline; gap: 8px; }
+  .d3-date b { font-family: 'Geist Mono', monospace; font-weight: 300; font-size: 26px; letter-spacing: -.02em; }
+  .d3-date span { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .today .d3-date span { color: var(--accent-ink); }
+  .past .d3-date b { color: var(--muted); }
+  .d3-lines { display: flex; flex-wrap: wrap; gap: 8px 26px; min-width: 0; }
+  .d3-ml { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); font-weight: 500; }
+  .d3-ml svg { display: block; overflow: visible; }
+  .d3-note { font-size: 12.5px; color: var(--muted); text-align: right; }
+  .d3-note .mono { color: var(--text); }
+  .d3-chev { color: var(--muted); transition: transform var(--t) var(--ease); }
+  .d3-day.open .d3-chev { transform: rotate(180deg); }
+  .d3-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 320ms var(--ease); }
+  .d3-day.open .d3-body { grid-template-rows: 1fr; }
+  .d3-in { overflow: hidden; }
+  .d3-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 28px; padding: 4px 20px 24px 134px; }
+  .d3-col h4 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--tx); margin-bottom: 6px; }
+  .d3-col h4 .mono { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+  .d3-stop { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 0 6px 0 2px; text-align: left; border-radius: 8px;
+    font-size: 13.5px; font-weight: 500; transition: background var(--t) var(--ease); }
+  .d3-stop:hover { background: var(--fill); }
+  .d3-stop .st { --s: 16px; position: relative; z-index: 1; }
+  .d3-stop::before { content: ''; position: absolute; left: 9px; top: -18px; height: 36px; border-left: 3px solid var(--c); z-index: 0; }
+  .d3-stop.first::before { display: none; }
+  .d3-stop.dash::before { border-left-style: dashed; }
+  .d3-stop.grey::before { border-left-color: var(--lock); border-bottom-color: var(--lock) !important; }
+  .d3-stop.br { margin-left: 22px; width: calc(100% - 22px); }
+  .d3-stop.br.first::before { display: block; left: -12px; top: -16px; height: 26px; width: 18px; border-bottom: 3px solid var(--c); border-bottom-left-radius: 12px; }
+  .d3-stop .tt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .d3-stop .tm { font-size: 11.5px; color: var(--muted); }
+  .d3-carry { font-size: 12px; color: var(--muted); padding: 6px 0 0 30px; }
+
+  /* ================= 4 · Rhythm ================= */
+  .d4 { --cw: 100px; }
+  .d4-scroll { height: 600px; overflow-y: auto; }
+  .d4-r { display: grid; grid-template-columns: 260px calc(var(--cw) * 7) 1fr; align-items: center; min-height: 34px; }
+  .d4-r.head { position: sticky; top: 0; z-index: 3; background: #fff; height: 48px; border-bottom: 1px solid var(--hair); }
+  .d4-days { display: grid; grid-template-columns: repeat(7, var(--cw)); text-align: center; font-size: 12.5px; color: var(--muted); font-weight: 500; }
+  .d4-days b { font-family: 'Geist Mono', monospace; font-weight: 400; color: var(--text); margin-left: 4px; }
+  .d4-days .today { color: var(--text); font-weight: 600; }
+  .d4-r.grp { min-height: 40px; padding-top: 8px; }
+  .d4-r.grp .nm { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--tx); padding-left: 20px; }
+  .d4-r.task { transition: background var(--t) var(--ease); }
+  .d4-r.task:hover { background: #F8F9FB; }
+  .d4-t { padding: 0 12px 0 36px; font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .d4-t .tm { font-size: 11.5px; color: var(--muted); margin-left: 6px; }
+  .d4-t.br { padding-left: 52px; }
+  .d4-lane { position: relative; height: 34px; }
+  .d4-lane svg { position: absolute; inset: 0; }
+  .d4-lane .cell { position: absolute; top: 0; height: 34px; width: var(--cw); display: grid; place-items: center; }
+  .d4-lane .cell .st { --s: 16px; }
+  .d4-lane .ghost { position: absolute; top: 13px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; border: 1.5px dashed var(--lock); background: #fff; }
+  .d4-rh { padding: 0 20px 0 16px; font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
+  .d4-band { position: absolute; top: 0; bottom: 0; width: var(--cw); background: var(--fill); pointer-events: none; }
+  .d4-body { position: relative; }
+  .d4-foot { position: sticky; bottom: 0; z-index: 3; background: #fff; border-top: 1px solid var(--hair); height: 56px; }
+  .d4-foot .lbl { padding-left: 20px; font-size: 12.5px; color: var(--muted); font-weight: 500; }
+  .d4-meter { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
+  .d4-meter i { display: block; width: 56px; height: 4px; border-radius: 2px; background: var(--fill-2); overflow: hidden; }
+  .d4-meter i::after { content: ''; display: block; height: 100%; width: var(--p); background: var(--text); border-radius: 2px; transition: width 400ms var(--ease); }
+
+  /* ================= 5 · Board ================= */
+  .d5 { display: grid; grid-template-columns: 380px 1fr; height: 660px; }
+  .d5-today { border-right: 1px solid var(--hair); display: flex; flex-direction: column; min-height: 0; transition: background var(--t) var(--ease); }
+  .d5-th { padding: 18px 20px 6px; display: flex; align-items: baseline; gap: 8px; }
+  .d5-th b { font-size: 17px; font-weight: 700; }
+  .d5-th .mono { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+  .d5-next { margin: 8px 16px 4px; display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 0 14px 0 16px; border: 1px solid var(--hair); border-radius: var(--r-lg); text-align: left; width: calc(100% - 32px); }
+  .d5-next .st { --s: 24px; }
+  .d5-next .nm { font-weight: 600; font-size: 16px; }
+  .d5-next .mt { font-size: 12.5px; color: var(--muted); margin-top: 2px; font-weight: 500; }
+  .d5-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 20px; }
+  .d5-grp h5 { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; color: var(--muted); padding: 16px 8px 4px; }
+  .d5-grp h5 .mono { font-weight: 400; }
+  .d5-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 4px 8px; text-align: left; border-radius: 10px; transition: background var(--t) var(--ease); }
+  .d5-row:hover { background: #F8F9FB; }
+  .d5-row .st { --s: 20px; }
+  .d5-row .tt { display: block; font-size: 14.5px; font-weight: 500; }
+  .d5-row .mt { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); margin-top: 1px; font-weight: 500; }
+  .d5-row .mt .ldot { width: 7px; height: 7px; }
+  .d5-week { display: flex; min-width: 0; overflow-x: auto; }
+  .d5-col { flex: 1 0 128px; display: flex; flex-direction: column; border-right: 1px solid var(--hair-2); min-height: 0; transition: background var(--t) var(--ease); }
+  .d5-col:last-child { border-right: 0; }
+  .d5-col.earlier { flex: 0 0 132px; background: #FBFBFC; }
+  .d5-col.some { background: #FBFBFC; }
+  .d5-ch { padding: 18px 12px 10px; }
+  .d5-ch span { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+  .d5-ch b { font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .d5-ch b .mono { font-size: 14px; }
+  .d5-drop { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .is-over { background: var(--accent-tint) !important; }
+  .d5-card { display: flex; align-items: flex-start; gap: 8px; padding: 9px 8px 9px 9px; border-radius: 10px; background: #fff; border: 1px solid var(--hair); font-size: 13px; font-weight: 500; line-height: 1.3;
+    cursor: grab; transition: box-shadow var(--t) var(--ease), transform var(--t) var(--ease); }
+  .d5-card:hover { box-shadow: var(--e1); }
+  .d5-card.dragging { opacity: .4; }
+  .d5-card .st { --s: 14px; margin-top: 1px; }
+  .d5-card .tm { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .d5-card .grip { margin-left: auto; color: var(--faint); flex: none; }
+  .d5-reps { margin-top: 2px; font-size: 12px; color: var(--muted); }
+  .d5-reps summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 6px 4px; border-radius: 8px; font-weight: 500; }
+  .d5-reps summary::-webkit-details-marker { display: none; }
+  .d5-reps summary:hover { background: var(--fill); color: var(--text); }
+  .d5-reps summary .ldot { width: 6px; height: 6px; }
+  .d5-reps ul { list-style: none; padding: 2px 4px 4px 8px; }
+  .d5-reps li { display: flex; align-items: center; gap: 6px; padding: 3px 0; color: var(--text-2); }
+  .d5-reps li .ldot { width: 6px; height: 6px; }
+  .d5-past { font-size: 12.5px; color: var(--muted); padding: 0 12px; line-height: 1.45; }
+  .d5-past p + p { margin-top: 12px; }
+  .d5-past b { display: block; color: var(--text-2); font-weight: 600; }
+  .d5-hint { font-size: 12px; color: var(--muted); padding: 4px 12px 0; }
+
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="intro">
+    <div>
+      <h1>Week view</h1>
+      <p>Five directions for seeing Tree-do a week at a time. All five read the same week (Wed 21 Oct, 11:20) and the same tasks, so tick something in one and the other four follow.</p>
+    </div>
+    <nav class="jump" aria-label="Jump to a direction">
+      <a href="#o1">Lines</a><a href="#o2">Hours</a><a href="#o3">Days</a><a href="#o4">Rhythm</a><a href="#o5">Board</a>
+    </nav>
+  </header>
+  <div class="legend" id="legend"></div>
+
+  <section class="opt" id="o1">
+    <div class="opt-head">
+      <h2><small>1</small>Lines</h2>
+      <p>The map, stretched over seven days. Each list is one line running left to right; each day is a stop showing how much of that list got done. Hover a line to quiet the others.</p>
+      <dl><dt>Leads with</dt><dd>Lists</dd><dt>Best for</dt><dd>Seeing where each list is heading</dd></dl>
+    </div>
+    <div class="wrap"><div class="frame" id="f1"></div></div>
+  </section>
+
+  <section class="opt" id="o2">
+    <div class="opt-head">
+      <h2><small>2</small>Hours</h2>
+      <p>A familiar calendar grid for the few things that have a time, with everything else held in an Anytime tray per day, folded to one chip per list. Open the tray to see the tasks.</p>
+      <dl><dt>Leads with</dt><dd>Time</dd><dt>Best for</dt><dd>Appointments, standups, meds</dd></dl>
+    </div>
+    <div class="wrap"><div class="frame" id="f2"></div></div>
+  </section>
+
+  <section class="opt" id="o3">
+    <div class="opt-head">
+      <h2><small>3</small>Days</h2>
+      <p>A day per row. Every day folds to a strip of tiny lines; today opens into its full timetable with branches. Past days say what carried over instead of showing an overdue pile.</p>
+      <dl><dt>Leads with</dt><dd>Today</dd><dt>Best for</dt><dd>Phones, low-overwhelm scanning</dd></dl>
+    </div>
+    <div class="wrap"><div class="frame" id="f3"></div></div>
+  </section>
+
+  <section class="opt" id="o4">
+    <div class="opt-head">
+      <h2><small>4</small>Rhythm</h2>
+      <p>Every task gets its own little line across the week, so repeats become a pattern you can read at a glance. One-offs show where they started and where they moved to.</p>
+      <dl><dt>Leads with</dt><dd>Repeats</dd><dt>Best for</dt><dd>Habits, weekly review</dd></dl>
+    </div>
+    <div class="wrap"><div class="frame" id="f4"></div></div>
+  </section>
+
+  <section class="opt" id="o5">
+    <div class="opt-head">
+      <h2><small>5</small>Board</h2>
+      <p>Today stays big on the left, the panel you already know. The rest of the week sits beside it as columns to drag one-offs into, with Someday at the end. Repeats fold away.</p>
+      <dl><dt>Leads with</dt><dd>Planning</dd><dt>Best for</dt><dd>Spreading the week out</dd></dl>
+    </div>
+    <div class="wrap"><div class="frame" id="f5"></div></div>
+  </section>
+</main>
+
+<script>
+// ---------- the week (shared by all five) ----------
+const LINES = {
+  up: { name: 'Upkeep',    c: '#5B6B7F', tx: '#4A5868', tint: '#EFF0F2' },
+  l1: { name: 'Work',      c: '#2F7CF6', tx: '#1F62D0', tint: '#EAF2FF' },
+  l2: { name: 'Health',    c: '#14A38B', tx: '#0B7563', tint: '#E8F6F3' },
+  l3: { name: 'Home move', c: '#F2645A', tx: '#C13D33', tint: '#FDF0EF' },
+};
+const LIDS = ['up', 'l1', 'l2', 'l3'];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((n, i) => ({ n, d: 19 + i, long: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][i] }));
+const TODAY = 2, NOW = '11:20';
+const ALL = [0,1,2,3,4,5,6], WK = [0,1,2,3,4];
+// key, line, title, time, days, rhythm
+const REPEATS = [
+  ['getup', 'up', 'Get up', null, ALL, 'Daily'],
+  ['bed', 'up', 'Make the bed', null, ALL, 'Daily'],
+  ['meds', 'up', 'Take meds', '08:00', ALL, 'Daily'],
+  ['bfast', 'up', 'Water + breakfast', null, ALL, 'Daily'],
+  ['inbox', 'up', 'Inbox, 10 minutes', null, WK, 'Weekdays'],
+  ['dishes', 'up', 'Dishes', null, ALL, 'Daily'],
+  ['plants', 'up', 'Water the plants', null, [0,3,6], 'Every 3 days'],
+  ['laundry', 'up', 'Laundry', null, [6], 'Sundays'],
+  ['laptop', 'l1', 'Open laptop', null, WK, 'Weekdays'],
+  ['plan3', 'l1', 'Write a 3-item plan', null, WK, 'Weekdays'],
+  ['standup', 'l1', 'Team standup', '10:30', [0,2,4], 'Mon, Wed, Fri'],
+  ['walk', 'l2', 'Walk around the block', null, ALL, 'Daily'],
+  ['stretch', 'l2', 'Stretch 10 min', '18:00', WK, 'Weekdays'],
+];
+// key, line, title, time, day ('S' = someday), branches off, carried from day
+const ONCE = [
+  ['bill', 'up', 'Pay electricity bill', null, 0],
+  ['library', 'up', 'Return library books', null, 4],
+  ['week', 'up', 'Plan next week', '19:00', 6],
+  ['bike', 'up', 'Fix the bike light', null, 'S'],
+  ['report', 'l1', 'Work 25 min on the report', null, 1],
+  ['draft', 'l1', 'Send report draft', null, 2],
+  ['email', 'l1', 'Answer one email', null, 2, 'plan3'],
+  ['sam', 'l1', "Reply to Sam's text", null, 2, 'plan3', 1],
+  ['final', 'l1', 'Send the final report', '16:00', 4],
+  ['gp', 'l2', 'Book GP appointment', null, 1, null, 0],
+  ['dentist', 'l2', 'Dentist', '15:00', 3],
+  ['mail', 'l3', 'Sort the mail pile', null, 0],
+  ['boxes', 'l3', 'Get 5 boxes', null, 0],
+  ['movers', 'l3', 'Call the movers', null, 1],
+  ['shelf', 'l3', 'Pack the bookshelf', null, 2],
+  ['kitchen', 'l3', 'Pack the kitchen', null, 2, 'shelf'],
+  ['glasses', 'l3', 'Wrap the glasses', null, 2, 'kitchen'],
+  ['label', 'l3', 'Label the boxes', null, 3],
+  ['van', 'l3', 'Movers arrive', '09:00', 5],
+  ['sofa', 'l3', 'Measure the sofa', null, 'S'],
+];
+const ORDER = ['getup','bed','meds','bfast','inbox','bill','dishes','plants','library','laundry','week','bike',
+  'laptop','plan3','standup','report','draft','email','sam','final','walk','stretch','gp','dentist',
+  'mail','boxes','movers','shelf','kitchen','glasses','label','van','sofa'];
+
+const tasks = [];
+REPEATS.forEach(([key, line, title, time, days, rhythm]) => days.forEach(day =>
+  tasks.push({ id: key + '@' + day, key, line, title, time, day, rhythm, from: null, carried: null, done: false })));
+ONCE.forEach(([key, line, title, time, day, from = null, carried = null]) =>
+  tasks.push({ id: key, key, line, title, time, day, rhythm: null, from, carried, done: false }));
+const doneToday = ['getup','bed','meds','bfast','inbox','laptop','plan3','standup','walk'];
+tasks.forEach(t => {
+  if (typeof t.day === 'number' && t.day < TODAY && t.id !== 'stretch@1') t.done = true;
+  if (t.day === TODAY && doneToday.includes(t.key)) t.done = true;
+});
+const ord = t => ORDER.indexOf(t.key);
+const byId = id => tasks.find(t => t.id === id);
+const on = (day, line) => tasks.filter(t => t.day === day && (!line || t.line === line))
+  .sort((a, b) => LIDS.indexOf(a.line) - LIDS.indexOf(b.line) || ord(a) - ord(b));
+const parentOf = t => t.from ? tasks.find(p => p.key === t.from && p.day === t.day) : null;
+
+function state(t) {
+  if (t.done) return 'done';
+  if (t.day === 'S') return 'someday';
+  if (t.day < TODAY) return 'missed';
+  if (t.day > TODAY) return 'later';
+  // today: the first open stop on each line (or branch) is ready, once the stop it branches off is done
+  const p = parentOf(t);
+  if (p && !p.done) return 'later';
+  const sibs = on(TODAY, t.line).filter(s => (parentOf(s) ? s.from : null) === (p ? t.from : null));
+  return sibs.find(s => !s.done) === t ? 'ready' : 'later';
+}
+const count = list => `${list.filter(t => t.done).length}/${list.length}`;
+const wk = () => tasks.filter(t => t.day !== 'S');
+
+// ---------- helpers ----------
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const vars = l => `--c:${LINES[l].c};--tx:${LINES[l].tx};--tint:${LINES[l].tint}`;
+const ST = '<span class="st" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M4 8.5l2.6 2.6L12 5.6"/></svg></span>';
+const WORD = { done: 'done', ready: 'ready now', later: 'later', missed: 'skipped, comes back on its day', someday: 'someday' };
+let popped = null;
+const cls = t => `s-${state(t)}${t.id === popped ? ' pop' : ''}`;
+const tickAttrs = (t, x = '') => `data-tick="${t.id}" style="${vars(t.line)}${x}" aria-pressed="${t.done}" aria-label="${esc(t.title)}, ${WORD[state(t)]}"`;
+const ldot = l => `<span class="ldot" style="--c:${LINES[l].c}"></span>`;
+const CHEV = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3.5 5.5L7 9l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const GRIP = '<svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true" class="grip"><g fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="7" cy="3" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="11" r="1.2"/><circle cx="7" cy="11" r="1.2"/></g></svg>';
+function bar(title, seg) {
+  const w = wk();
+  return `<div class="bar"><span class="ttl">${title}</span><span class="rng mono">19–25 Oct</span>
+    <div class="seg" aria-hidden="true"><span>Today</span><span class="on">Week</span></div>
+    <span class="cnt mono"><b>${w.filter(t => t.done).length}</b> of ${w.length} done</span></div>`;
+}
+const ui = { trayOpen: false, d3open: new Set([TODAY]) };
+
+// ---------- 1 · Lines ----------
+function d1() {
+  let h = bar('This week') + '<div class="d1" role="grid">';
+  h += `<div class="d1-h">Lists</div>` + DAYS.map((d, i) => `<div class="d1-h ${i === TODAY ? 'today' : ''}">${d.n} <b>${d.d}</b>${i === TODAY ? '<em>Today</em>' : ''}</div>`).join('');
+  for (const l of LIDS) {
+    const all = wk().filter(t => t.line === l);
+    h += `<div class="d1-row" style="${vars(l)}"><div class="d1-name"><div class="n">${ldot(l)}${LINES[l].name}</div><div class="k mono">${count(all)} this week</div></div>`;
+    DAYS.forEach((d, i) => {
+      const ts = on(i, l), n = ts.filter(t => t.done).length, full = ts.length && n === ts.length;
+      const segA = i < TODAY ? (full ? '' : 'dash grey') : i === TODAY ? '' : 'dash grey';
+      const segB = i < TODAY ? (full ? '' : 'dash grey') : i === TODAY ? (full ? '' : 'dash') : 'dash grey';
+      const stop = !ts.length ? '' : i > TODAY ? 'later' : full ? 'full' : 'part';
+      h += `<div class="d1-cell ${i === TODAY ? 'today' : ''}"><span class="a ${segA}"></span><span class="b ${segB}"></span>`;
+      if (ts.length) h += `<span class="d1-stop ${stop}" style="--p:${Math.round(n / ts.length * 100)}%"></span><span class="mono">${n}/${ts.length}</span>`;
+      h += ts.map(t => `<button class="d1-it ${cls(t)} ${t.from ? 'br' : ''}" ${tickAttrs(t)}>${ST}<span class="tt">${t.time ? `<span class="tm mono">${t.time}</span>` : ''}${esc(t.title)}</span></button>`).join('');
+      h += tasks.filter(t => t.carried === i && t.line === l).map(t => `<div class="d1-ghost"><span aria-hidden="true">→</span><span>${esc(t.title)}, moved to ${DAYS[t.day].n}</span></div>`).join('');
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+  return h + '</div>';
+}
+
+// ---------- 2 · Hours ----------
+const mins = s => { const [a, b] = s.split(':').map(Number); return a * 60 + b; };
+function d2() {
+  let h = bar('This week') + '<div class="d2">';
+  h += '<div class="d2-cols"><div class="d2-h"></div>' + DAYS.map((d, i) => `<div class="d2-h ${i === TODAY ? 'today' : i < TODAY ? 'past' : ''}"><span>${d.n}</span><b>${d.d}</b></div>`).join('') + '</div>';
+  h += `<div class="d2-cols d2-tray ${ui.trayOpen ? 'open' : ''}"><div class="d2-tlabel"><button data-tray aria-expanded="${ui.trayOpen}">Anytime ${CHEV}</button></div>`;
+  DAYS.forEach((d, i) => {
+    h += `<div class="d2-tc ${i < TODAY ? 'past' : ''}">`;
+    for (const l of LIDS) {
+      const ts = on(i, l).filter(t => !t.time);
+      if (!ts.length) continue;
+      const allDone = ts.every(t => t.done), anyReady = ts.some(t => state(t) === 'ready');
+      h += `<div class="d2-chip ${allDone ? 'done' : anyReady ? '' : 'later'}" style="${vars(l)}">${ldot(l)}<span class="nm">${LINES[l].name}</span><span class="mono">${count(ts)}</span></div>`;
+      h += `<div class="d2-list">${ts.map(t => `<button class="d2-li ${cls(t)}" ${tickAttrs(t)}>${ST}<span class="tt">${esc(t.title)}</span></button>`).join('')}</div>`;
+    }
+    h += '</div>';
+  });
+  h += '</div><div class="d2-scroll"><div class="d2-grid"><div class="d2-gut">';
+  for (let hr = 8; hr <= 21; hr++) h += `<span class="mono" style="top:calc(var(--hh) * ${hr - 7})">${String(hr).padStart(2, '0')}:00</span>`;
+  h += '</div>';
+  let k = 0;
+  DAYS.forEach((d, i) => {
+    h += `<div class="d2-col ${i < TODAY ? 'past' : ''}">`;
+    h += on(i).filter(t => t.time).map(t => `<button class="d2-ev ${cls(t)}" ${tickAttrs(t, `;--i:${k++};top:calc(var(--hh) * ${(mins(t.time) - 420) / 60})`)}>${ST}<span class="tt">${esc(t.title)}</span><span class="tm mono">${t.time}</span></button>`).join('');
+    if (i === TODAY) { const y = `calc(var(--hh) * ${(mins(NOW) - 420) / 60})`; h += `<div class="d2-now" style="top:${y}"></div><span class="d2-nowlbl mono" style="top:${y}">${NOW}</span>`; }
+    h += '</div>';
+  });
+  return h + '</div></div></div>';
+}
+
+// ---------- 3 · Days ----------
+function mini(ts, l) {
+  const gap = 13, w = (ts.length - 1) * gap + 10;
+  let s = `<svg width="${w}" height="10" aria-hidden="true">`;
+  ts.forEach((t, j) => {
+    if (j) { const prev = ts[j - 1]; s += `<line x1="${(j - 1) * gap + 5}" y1="5" x2="${j * gap + 5}" y2="5" stroke="${t.done ? LINES[l].c : '#C5CBD3'}" stroke-width="2" ${t.done ? '' : 'stroke-dasharray="2 2"'}/>`; }
+    const st = state(t);
+    s += st === 'done' ? `<circle cx="${j * gap + 5}" cy="5" r="4" fill="${LINES[l].c}"/>`
+      : `<circle cx="${j * gap + 5}" cy="5" r="3.5" fill="#fff" stroke="${st === 'ready' ? LINES[l].c : '#C5CBD3'}" stroke-width="1.5"/>`;
+  });
+  return s + '</svg>';
+}
+function d3() {
+  let h = bar('This week');
+  DAYS.forEach((d, i) => {
+    const all = on(i), open = ui.d3open.has(i), n = all.filter(t => t.done).length;
+    const moved = tasks.filter(t => t.carried === i), skipped = all.filter(t => state(t) === 'missed');
+    let note = `<span class="mono">${n}/${all.length}</span>`;
+    if (i < TODAY) note = moved.length ? `${n} done · ${moved.length} moved to ${DAYS[moved[0].day].n}` : skipped.length ? `${n} done · ${skipped.length} skipped` : `All ${n} done`;
+    else if (i === TODAY) note = `<span class="mono">${n}/${all.length}</span> · ${all.filter(t => state(t) === 'ready').length} ready now`;
+    h += `<div class="d3-day ${open ? 'open' : ''} ${i === TODAY ? 'today' : i < TODAY ? 'past' : ''}">
+      <button class="d3-sum" data-d3="${i}" aria-expanded="${open}"><span class="d3-date"><b>${d.d}</b><span>${i === TODAY ? 'Today' : d.n}</span></span>
+      <span class="d3-lines">${LIDS.filter(l => on(i, l).length).map(l => `<span class="d3-ml">${mini(on(i, l), l)}${LINES[l].name}</span>`).join('')}</span>
+      <span class="d3-note">${note}</span><span class="d3-chev">${CHEV}</span></button>
+      <div class="d3-body"><div class="d3-in"><div class="d3-grid">`;
+    for (const l of LIDS) {
+      const ts = on(i, l);
+      h += `<div class="d3-col" style="${vars(l)}"><h4>${ldot(l)}${LINES[l].name}<span class="mono">${ts.length ? count(ts) : ''}</span></h4>`;
+      let prevBranch = null;
+      ts.forEach((t, j) => {
+        const first = j === 0 || (t.from && prevBranch !== t.from);
+        prevBranch = t.from;
+        const seg = t.done ? '' : state(t) === 'ready' ? 'dash' : 'dash grey';
+        h += `<button class="d3-stop ${cls(t)} ${t.from ? 'br' : ''} ${first ? 'first' : ''} ${seg}" ${tickAttrs(t)}>${ST}<span class="tt">${esc(t.title)}</span>${t.time ? `<span class="tm mono">${t.time}</span>` : ''}</button>`;
+      });
+      if (!ts.length) h += `<div class="d3-carry">Nothing on this line</div>`;
+      h += tasks.filter(t => t.carried === i && t.line === l).map(t => `<div class="d3-carry">${esc(t.title)} moved to ${DAYS[t.day].n}</div>`).join('');
+      h += '</div>';
+    }
+    h += '</div></div></div></div>';
+  });
+  return h;
+}
+
+// ---------- 4 · Rhythm ----------
+function d4() {
+  const CW = 100, X = i => i * CW + CW / 2;
+  let h = bar('This week') + '<div class="d4"><div class="d4-scroll">';
+  h += `<div class="d4-r head"><div></div><div class="d4-days">${DAYS.map((d, i) => `<span class="${i === TODAY ? 'today' : ''}">${d.n}<b>${d.d}</b></span>`).join('')}</div><div class="d4-rh">Rhythm</div></div>`;
+  h += `<div class="d4-body"><span class="d4-band" style="left:${260 + TODAY * CW}px"></span>`;
+  for (const l of LIDS) {
+    h += `<div class="d4-r grp" style="${vars(l)}"><div class="nm">${ldot(l)}${LINES[l].name}</div></div>`;
+    const keys = [...new Set(tasks.filter(t => t.line === l && t.day !== 'S').sort((a, b) => ord(a) - ord(b)).map(t => t.key))];
+    for (const key of keys) {
+      const row = tasks.filter(t => t.key === key).sort((a, b) => a.day - b.day), t0 = row[0];
+      const pts = row.map(t => t.day);
+      if (t0.carried !== null) pts.unshift(t0.carried);
+      let svg = `<svg width="${CW * 7}" height="34" aria-hidden="true">`;
+      for (let j = 1; j < pts.length; j++) {
+        const t = row.find(r => r.day === pts[j]), st = state(t), ghost = t0.carried !== null && j === 1;
+        const col = st === 'done' && !ghost ? LINES[l].c : st === 'ready' ? LINES[l].c : '#C5CBD3';
+        svg += `<line x1="${X(pts[j - 1])}" y1="17" x2="${X(pts[j])}" y2="17" stroke="${col}" stroke-width="3" stroke-linecap="round" ${st === 'done' && !ghost ? '' : 'stroke-dasharray="5 6"'}/>`;
+      }
+      svg += '</svg>';
+      h += `<div class="d4-r task" style="${vars(l)}"><div class="d4-t ${t0.from ? 'br' : ''}">${esc(t0.title)}${t0.time ? `<span class="tm mono">${t0.time}</span>` : ''}</div>
+        <div class="d4-lane">${svg}${t0.carried !== null ? `<span class="ghost" style="left:${X(t0.carried)}px" title="Planned for ${DAYS[t0.carried].n}"></span>` : ''}
+        ${row.map(t => `<button class="cell ${cls(t)}" ${tickAttrs(t, `;left:${t.day * CW}px`)}>${ST}</button>`).join('')}</div>
+        <div class="d4-rh">${t0.rhythm || (t0.carried !== null ? 'Moved once' : 'Once')}</div></div>`;
+    }
+  }
+  h += '</div>';
+  h += `<div class="d4-r d4-foot"><div class="lbl">Done each day</div><div class="d4-days">${DAYS.map((d, i) => { const a = on(i), n = a.filter(t => t.done).length;
+    return `<span class="d4-meter"><span class="mono">${n}/${a.length}</span><i style="--p:${Math.round(n / a.length * 100)}%"></i></span>`; }).join('')}</div></div>`;
+  return h + '</div></div>';
+}
+
+// ---------- 5 · Board ----------
+function d5row(t) {
+  const meta = [LINES[t.line].name, t.time && `<span class="mono">${t.time}</span>`, t.rhythm].filter(Boolean).join(' · ');
+  return `<button class="d5-row ${cls(t)}" ${tickAttrs(t)}>${ST}<span><span class="tt">${esc(t.title)}</span><span class="mt">${ldot(t.line)}${meta}</span></span></button>`;
+}
+function d5card(t) {
+  return `<div class="d5-card ${cls(t)}" draggable="true" data-drag="${t.id}" style="${vars(t.line)}">
+    <button ${tickAttrs(t)}>${ST}</button><span>${esc(t.title)}${t.time ? `<span class="tm mono">${t.time}</span>` : ''}</span>${GRIP}</div>`;
+}
+function d5() {
+  const today = on(TODAY), ready = today.filter(t => state(t) === 'ready').sort((a, b) => (a.time ? 1 : 0) - (b.time ? 1 : 0));
+  const later = today.filter(t => state(t) === 'later'), done = today.filter(t => t.done), next = ready[0];
+  let h = bar('This week') + '<div class="d5">';
+  h += `<div class="d5-today" data-drop="${TODAY}"><div class="d5-th"><b>Wednesday 21</b><span class="mono">${done.length} of ${today.length}</span></div>`;
+  if (next) h += `<button class="d5-next ${cls(next)}" ${tickAttrs(next)}>${ST}<span><span class="nm">${esc(next.title)}</span><span class="mt" style="display:block">Up next · ${LINES[next.line].name}</span></span></button>`;
+  h += `<div class="d5-scroll">`;
+  [['Ready now', ready.slice(1)], ['Later', later], ['Done', done]].forEach(([nm, ls]) => {
+    if (ls.length) h += `<div class="d5-grp"><h5>${nm}<span class="mono">${ls.length}</span></h5>${ls.map(d5row).join('')}</div>`;
+  });
+  h += '</div></div><div class="d5-week">';
+  const moved = tasks.filter(t => t.carried !== null && t.carried < TODAY);
+  h += `<div class="d5-col earlier"><div class="d5-ch"><span>Earlier</span><b>Mon–Tue</b></div><div class="d5-past">
+    ${[0, 1].map(i => { const a = on(i); return `<p><b>${DAYS[i].n} ${DAYS[i].d}</b>${a.filter(t => t.done).length} of ${a.length} done</p>`; }).join('')}
+    ${moved.map(t => `<p>${esc(t.title)} moved to ${t.day === TODAY ? 'today' : DAYS[t.day].n}</p>`).join('')}</div></div>`;
+  [3, 4, 5, 6, 'S'].forEach(i => {
+    const ts = i === 'S' ? tasks.filter(t => t.day === 'S') : on(i);
+    const once = ts.filter(t => !t.rhythm), reps = ts.filter(t => t.rhythm);
+    h += `<div class="d5-col ${i === 'S' ? 'some' : ''}" data-drop="${i}"><div class="d5-ch"><span>${i === 'S' ? 'No date' : 'Oct'}</span><b>${i === 'S' ? 'Someday' : `${DAYS[i].n} <span class="mono">${DAYS[i].d}</span>`}</b></div><div class="d5-drop">`;
+    h += once.map(d5card).join('');
+    if (reps.length) h += `<details class="d5-reps"><summary>${reps.length} repeats ${[...new Set(reps.map(t => t.line))].map(ldot).join('')}</summary><ul>${reps.map(t => `<li>${ldot(t.line)}${esc(t.title)}</li>`).join('')}</ul></details>`;
+    if (i === 3) h += '<p class="d5-hint">Drag a task to another day, or onto today.</p>';
+    h += '</div></div>';
+  });
+  return h + '</div></div>';
+}
+
+// ---------- render + interactions ----------
+const R = [['f1', d1], ['f2', d2], ['f3', d3], ['f4', d4], ['f5', d5]];
+function render() {
+  const keep = [...document.querySelectorAll('.d2-scroll, .d4-scroll, .d5-scroll')].map(e => e.scrollTop);
+  R.forEach(([id, fn]) => { document.getElementById(id).innerHTML = fn(); });
+  document.querySelectorAll('.d2-scroll, .d4-scroll, .d5-scroll').forEach((e, i) => { if (keep[i] != null) e.scrollTop = keep[i]; });
+  popped = null;
+}
+document.getElementById('legend').innerHTML =
+  LIDS.map(l => `<span>${ldot(l)}${LINES[l].name}</span>`).join('') +
+  `<span class="s-done" style="${vars('l1')}">${ST}Done</span><span class="s-ready" style="${vars('l1')}">${ST}Ready now</span><span class="s-later" style="${vars('l1')}">${ST}Later</span>`;
+
+document.addEventListener('click', e => {
+  const tk = e.target.closest('[data-tick]');
+  if (tk) { const t = byId(tk.dataset.tick); t.done = !t.done; if (t.done) popped = t.id; render(); return; }
+  if (e.target.closest('[data-tray]')) { ui.trayOpen = !ui.trayOpen; render(); return; }
+  const d = e.target.closest('[data-d3]');
+  if (d) { const i = +d.dataset.d3; ui.d3open.has(i) ? ui.d3open.delete(i) : ui.d3open.add(i); d.closest('.d3-day').classList.toggle('open'); d.setAttribute('aria-expanded', ui.d3open.has(i)); }
+});
+let dragId = null;
+document.addEventListener('dragstart', e => { const c = e.target.closest('[data-drag]'); if (!c) return; dragId = c.dataset.drag; c.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); });
+document.addEventListener('dragend', () => { dragId = null; document.querySelectorAll('.dragging, .is-over').forEach(n => n.classList.remove('dragging', 'is-over')); });
+document.addEventListener('dragover', e => { const z = e.target.closest('[data-drop]'); if (!z || !dragId) return; e.preventDefault();
+  document.querySelectorAll('.is-over').forEach(n => n !== z && n.classList.remove('is-over')); z.classList.add('is-over'); });
+document.addEventListener('drop', e => { const z = e.target.closest('[data-drop]'); if (!z || !dragId) return; e.preventDefault();
+  const t = byId(dragId), v = z.dataset.drop; t.day = v === 'S' ? 'S' : +v; t.from = null; t.carried = null; render(); });
+render();
+</script>
+</body>
+</html>

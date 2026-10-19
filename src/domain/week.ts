@@ -15,6 +15,7 @@ export interface DayItem {
   line: string;
   title: string;
   time: string | null;
+  duration: number | null;
   /** The task it branches off, when that one is on the same day. */
   from: string | null;
   state: DayState;
@@ -23,12 +24,13 @@ export interface DayItem {
 }
 
 /** A place on the week to add a task: a day, and a time unless it went in the Anytime tray. */
-export interface Slot { day: string; time: string | null }
+export interface Slot { day: string; time: string | null; duration?: number | null }
 
 /** Words typed into a slot on the week: the slot gives the day and time, unless the words say otherwise ("every monday", "3pm"). */
-export function slotSchedule(p: { repeat: Task['repeat']; date: string | null; time: string | null; someday: boolean }, slot: Slot, today: string): { date: string | null; time: string | null } {
+export function slotSchedule(p: { repeat: Task['repeat']; date: string | null; time: string | null; duration: number | null; someday: boolean }, slot: Slot, today: string): { date: string | null; time: string | null; duration: number | null } {
   const ownDay = !!(p.repeat || p.someday || p.date);
-  return { date: ownDay ? p.date : slot.day > today ? slot.day : null, time: p.time ?? slot.time };
+  return { date: ownDay ? p.date : slot.day > today ? slot.day : null, time: p.time ?? slot.time,
+    duration: p.time ? p.duration : p.duration ?? slot.duration ?? null };   // a typed time brings its own length (or none)
 }
 
 /** How long the done-log keeps a day: enough for last week's Monday to show in this week's view. */
@@ -72,10 +74,10 @@ export function dayItems(plan: Plan, day: string, today: string): DayItem[] {
   if (day < today) {
     const live = new Set(plan.tasks.map(t => t.id));
     const done = (plan.history?.[day] ?? []).filter(e => lineIds.includes(e.line));
-    return lineIds.flatMap(l => done.filter(e => e.line === l).map(e => ({ ...e, from: null, state: 'done' as const, live: live.has(e.id) })));
+    return lineIds.flatMap(l => done.filter(e => e.line === l).map(e => ({ ...e, duration: e.duration ?? null, from: null, state: 'done' as const, live: live.has(e.id) })));
   }
   const toItem = (t: Task, state: DayState, on: Set<string>): DayItem =>
-    ({ id: t.id, line: t.line, title: t.title, time: t.time, from: t.from && on.has(t.from) ? t.from : null, state, live: true });
+    ({ id: t.id, line: t.line, title: t.title, time: t.time, duration: t.duration ?? null, from: t.from && on.has(t.from) ? t.from : null, state, live: true });
   if (day === today) {
     const net = buildNetwork(plan, today), states = lineStates(net, today);
     const list = net.order.filter(t => !isLeftover(t, today));
@@ -91,7 +93,7 @@ export function dayItems(plan: Plan, day: string, today: string): DayItem[] {
 
 export function logDone(plan: Plan, t: Task, day: string): void {
   const history = plan.history ??= {};
-  history[day] = [...(history[day] ?? []).filter(e => e.id !== t.id), { id: t.id, line: t.line, title: t.title, time: t.time }];
+  history[day] = [...(history[day] ?? []).filter(e => e.id !== t.id), { id: t.id, line: t.line, title: t.title, time: t.time, duration: t.duration ?? null }];
 }
 export function unlogDone(plan: Plan, id: string, day: string): void {
   const list = plan.history?.[day];

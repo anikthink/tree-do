@@ -6,7 +6,7 @@ import type { Store } from '../app/store';
 import { lineById } from '../domain/lines';
 import { type Parsed, parse, parseContext, repeatShort } from '../domain/parse';
 import { inheritSchedule, isDueToday, nextOrder, placeNear, taskById } from '../domain/rules';
-import { niceDate } from '../domain/time';
+import { durationText, niceDate, timeRange } from '../domain/time';
 import type { Task } from '../domain/types';
 import { elementOf, esc, type Dom } from './dom';
 import { icon } from './icons';
@@ -32,7 +32,7 @@ export function createAddField(store: Store, dom: Dom, app: App) {
   function draft(p: Parsed, from: Task | undefined): { t: Task; target: Task | undefined } {
     const target = !from && p.place ? taskById(st.plan.tasks, p.place.id) : undefined;
     const t: Task = { id: 't' + Date.now().toString(36), line: from ? from.line : p.line, title: p.title, order: 0,
-      from: from ? from.id : null, fork: 0, repeat: p.repeat, time: p.time, date: p.date, someday: p.someday, doneOn: null, lastDone: null, skip: null };
+      from: from ? from.id : null, fork: 0, repeat: p.repeat, time: p.time, duration: p.duration, date: p.date, someday: p.someday, doneOn: null, lastDone: null, skip: null };
     if (target) { t.line = target.line; t.from = target.from; t.fork = target.fork || 0; inheritSchedule(t, target, st.today); }
     t.anchor = p.anchor && !from && t.line === 'up';
     return { t, target };
@@ -57,7 +57,8 @@ export function createAddField(store: Store, dom: Dom, app: App) {
     if (t.someday) parts.push(`<span class="chip">${icon('archive', 13)}Someday</span>`);
     else if (t.repeat) parts.push(`<span class="chip">${icon('repeat', 13)}${repeatShort(t.repeat)}</span>`);
     else parts.push(`<span class="chip">${icon('calendar', 13)}${t.date ? niceDate(t.date, st.today) : 'Today'}</span>`);
-    if (t.time) parts.push(`<span class="chip t">${t.time}</span>`);
+    if (t.time) parts.push(`<span class="chip t">${timeRange(t.time, t.duration)}</span>`);
+    else if (t.duration) parts.push(`<span class="chip t">${durationText(t.duration)}</span>`);
     if (t.anchor) parts.push('<span class="chip">Starts the day</span>');
     parts.push(`<span class="hint">${p.lineGuess && !from && !target ? '<code>#work</code> puts it in the Work list · ' : ''}Enter adds</span>`);
     chips.innerHTML = parts.join('');

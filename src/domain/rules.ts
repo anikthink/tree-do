@@ -113,6 +113,8 @@ export interface TaskEdit {
   title: string;
   line: string;
   time: string | null;
+  /** Minutes, or null for none set. */
+  duration: number | null;
   /** One-offs: the day (today or earlier means today). Ignored for repeats. */
   date: string | null;
   repeat: Repeat | null;
@@ -126,6 +128,7 @@ export function editTask(tasks: readonly Task[], t: Task, e: TaskEdit, today: st
   const title = e.title.trim();
   if (title) t.title = title;
   t.time = e.time;
+  t.duration = e.duration;
   t.someday = false;
   if (e.repeat) {
     if (JSON.stringify(e.repeat) !== JSON.stringify(t.repeat)) t.skip = null;
@@ -139,4 +142,10 @@ export function editTask(tasks: readonly Task[], t: Task, e: TaskEdit, today: st
     t.line = e.line; t.from = null; t.fork = 0; t.order = nextOrder(tasks);
     if (t.line !== 'up') t.anchor = false;
   }
+}
+
+/** Dragged on the week: a new start and length, and for a one-off a new day. A repeat keeps its days. */
+export function retime(t: Task, time: string, duration: number, day: string, today: string): void {
+  t.time = time; t.duration = duration;
+  if (!t.repeat) { t.date = day > today ? day : null; t.someday = false; }
 }

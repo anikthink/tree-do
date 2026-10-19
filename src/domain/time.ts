@@ -43,6 +43,19 @@ export function serviceDay(dayStart: number, d: Date): string {
 
 export const minutesOf = (d: Date): number => d.getHours() * 60 + d.getMinutes();
 
+/** A timed task with no length of its own lasts this long on the week. */
+export const DEFAULT_MINS = 30;
+/** Minutes since midnight → `HH:MM` (24:00 for the end of the day). */
+export const hhmm = (m: number): string => `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+/** "10:30–11:15" when it has a length, else "10:30". */
+export function timeRange(time: string, duration?: number | null): string {
+  return duration ? `${time}–${hhmm(Math.min(24 * 60, toMin(time) + duration))}` : time;
+}
+/** "45 min", "2h", "1h 30m". */
+export function durationText(m: number): string {
+  return m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m / 60}h`;
+}
+
 /** `HH:MM` → minutes since midnight. */
 export function toMin(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);

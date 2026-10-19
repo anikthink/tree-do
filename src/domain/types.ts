@@ -24,6 +24,8 @@ export interface Task {
   anchor?: boolean;
   repeat: Repeat | null;
   time: string | null;
+  /** How long it takes, in minutes. A timed task without one shows as DEFAULT_MINS on the week. */
+  duration?: number | null;
   /** One-offs: planned for this day (not shown before it). */
   date: string | null;
   someday: boolean;
@@ -75,6 +77,7 @@ export interface DoneEntry {
   line: string;
   title: string;
   time: string | null;
+  duration?: number | null;
 }
 
 /** A task's place on today's map: finished, ready to do, or later in its line. */
