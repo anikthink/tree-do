@@ -1,10 +1,12 @@
 // What the user does to the plan: tick, move, undo, reset. Every change ends in replan(),
 // which rebuilds today's map, sends trains to whatever opened, and notifies the store (which saves).
-import { type Where, canPlace, isDone, markDone, nextOrder, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen, taskById } from '../domain/rules';
+import { lineById } from '../domain/lines';
+import { parse, parseContext, repeatShort } from '../domain/parse';
+import { type TaskEdit, type Where, canPlace, editTask, inheritSchedule, isDone, markDone, nextOrder, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen, taskById } from '../domain/rules';
 import { seed } from '../domain/seed';
-import { serviceDay } from '../domain/time';
-import { isPlan } from '../domain/types';
-import { logDone, pruneHistory, unlogDone } from '../domain/week';
+import { niceDate, serviceDay } from '../domain/time';
+import { type Task, isPlan } from '../domain/types';
+import { type Slot, logDone, pruneHistory, slotSchedule, unlogDone } from '../domain/week';
 import { dispatchTrains, seedArrived } from '../map/trains';
 import { vstate } from '../map/status';
 import type { App, MoveKind } from './context';
@@ -113,5 +115,33 @@ export function createActions(store: Store, app: App, rebuild: () => void) {
     app.toast('↕', `“${t.title}” moved ${where} “${target.title}”.`, true);
   }
 
-  return { replan, snapshot, undo, activate, move, place, resetDemo, tick };
+  /** Typed into a slot on the week: the slot's day and time unless the words say otherwise; `line` is the list picked there. */
+  function addAt(text: string, slot: Slot, line: string | null): Task | null {
+    const p = parse(text, parseContext(st.plan, st.today));
+    if (!p.title) return null;
+    snapshot();
+    const { date, time } = slotSchedule(p, slot, st.today);
+    const target = p.place ? taskById(st.plan.tasks, p.place.id) : undefined;
+    const t: Task = { id: 't' + Date.now().toString(36), line: p.lineGuess && line && lineById(st.plan, line) ? line : p.line, title: p.title, order: 0,
+      from: null, fork: 0, repeat: p.repeat, time, date, someday: p.someday, doneOn: null, lastDone: null, skip: null };
+    t.anchor = p.anchor && t.line === 'up';
+    if (target && p.place) { t.line = target.line; t.from = target.from; t.fork = target.fork || 0; inheritSchedule(t, target, st.today); placeNear(st.plan.tasks, t, target, p.place.where); }
+    else t.order = nextOrder(st.plan.tasks);
+    st.plan.tasks.push(t);
+    replan();
+    const when = t.someday ? 'for someday' : t.repeat ? repeatShort(t.repeat).toLowerCase() : niceDate(t.date ?? st.today, st.today).replace(/^(Today|Tomorrow)$/, m => m.toLowerCase());
+    app.toast('+', `“${t.title}” added to ${lineById(st.plan, t.line)?.name ?? 'its list'}, ${when}${t.time ? ' at ' + t.time : ''}.`, true);
+    return t;
+  }
+
+  /** Changed in the week's editor: name, list, day, time, repeat. */
+  function edit(id: string, e: TaskEdit): void {
+    const t = taskById(st.plan.tasks, id); if (!t) return;
+    snapshot();
+    editTask(st.plan.tasks, t, e, st.today);
+    replan({ instant: true });
+    app.toast('✓', `“${t.title}” updated.`, true);
+  }
+
+  return { replan, snapshot, undo, activate, move, place, resetDemo, tick, addAt, edit };
 }

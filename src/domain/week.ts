@@ -22,6 +22,15 @@ export interface DayItem {
   live: boolean;
 }
 
+/** A place on the week to add a task: a day, and a time unless it went in the Anytime tray. */
+export interface Slot { day: string; time: string | null }
+
+/** Words typed into a slot on the week: the slot gives the day and time, unless the words say otherwise ("every monday", "3pm"). */
+export function slotSchedule(p: { repeat: Task['repeat']; date: string | null; time: string | null; someday: boolean }, slot: Slot, today: string): { date: string | null; time: string | null } {
+  const ownDay = !!(p.repeat || p.someday || p.date);
+  return { date: ownDay ? p.date : slot.day > today ? slot.day : null, time: p.time ?? slot.time };
+}
+
 /** How long the done-log keeps a day: enough for last week's Monday to show in this week's view. */
 export const HISTORY_DAYS = 14;
 
