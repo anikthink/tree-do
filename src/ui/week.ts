@@ -1,11 +1,12 @@
 // The week views beside the panel: Hours (a time grid, untimed tasks in an Anytime tray) and Days (a row per day,
 // each folding to a strip of tiny lines). A task's circle ticks it (today); the rest of it opens an editor.
-// Click an empty time (or a day's +) to add a task right there, like a calendar.
+// Click an empty time (or a day's +) to add a task right there, like a calendar. On the Hours grid, drag across
+// empty time to add something of any length, drag a task to move it, and drag its bottom edge to change its length.
 import type { App } from '../app/context';
 import type { Mode, Store } from '../app/store';
 import { allLines, lineById } from '../domain/lines';
 import { parse, parseContext, repeatShort } from '../domain/parse';
-import { DOW, minutesOf, niceDate, pad2, parseYmd, shortDate, toMin } from '../domain/time';
+import { DEFAULT_MINS, DOW, hhmm, minutesOf, niceDate, parseYmd, shortDate, timeRange, toMin } from '../domain/time';
 import { taskById } from '../domain/rules';
 import type { Line, Repeat } from '../domain/types';
 import { type DayItem, type Slot, dayItems, slotSchedule, weekDays } from '../domain/week';
@@ -16,7 +17,10 @@ import { TICK, icon } from './icons';
 const MODES: readonly Mode[] = ['map', 'hours', 'days'];
 const asMode = (v: string | undefined): Mode => MODES.find(m => m === v) ?? 'map';
 /** Hours: one hour's height. Days: one stop's row height and a branch's indent. */
-const HH = 44, RH = 32, IND = 20;
+const HH = 48, RH = 32, IND = 20;
+/** Dragging on the grid snaps to quarter hours. */
+const SNAP = 15, DAY_END = 24 * 60;
+const lengthOf = (it: { duration: number | null }): number => it.duration ?? DEFAULT_MINS;
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const STATE_WORD: Record<DayItem['state'], string> = { done: 'done', ready: 'ready now', later: 'later' };
 
@@ -36,16 +40,16 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
    * A task on the week: its circle ticks it off (today only; ticking a done one reopens it), the rest opens the editor.
    * Earlier days are a record; a task still in the plan can be edited from there too.
    */
-  function itemTag(d: Day, it: DayItem, cls: string, body: string, style = ''): string {
+  function itemTag(d: Day, it: DayItem, cls: string, body: string, style = '', extra = ''): string {
     const l = lineOf(it.line); if (!l) return '';
-    const label = `${esc(it.title)}, ${esc(l.name)}${it.time ? ', ' + it.time : ''}, ${STATE_WORD[it.state]}`;
+    const label = `${esc(it.title)}, ${esc(l.name)}${it.time ? ', ' + timeRange(it.time, it.duration).replace('–', ' to ') : ''}, ${STATE_WORD[it.state]}`;
     const tick = d.rel === 'today'
       ? `<button type="button" class="wmb" data-tick="${it.id}" aria-label="${it.state === 'done' ? 'Not done yet' : 'Done'}: ${esc(it.title)}">${mark(it.state)}</button>`
       : `<span class="wmb">${mark(it.state)}</span>`;
     const main = d.rel !== 'past' || it.live
       ? `<button type="button" class="wbody" data-open="${it.id}" data-on="${d.day}" aria-label="${label}. Edit.">${body}</button>`
       : `<span class="wbody" aria-label="${label}">${body}</span>`;
-    return `<div class="${cls} ${it.state}" data-item="${it.id}@${d.day}" style="${vars(l)}${style}">${tick}${main}</div>`;
+    return `<div class="${cls} ${it.state}" data-item="${it.id}@${d.day}" style="${vars(l)}${style}">${tick}${main}${extra}</div>`;
   }
   const dayName = (d: Day): string => {
     const diff = Math.round((parseYmd(d.day).getTime() - parseYmd(st.today).getTime()) / 864e5);
@@ -59,14 +63,17 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
 
   function head(days: string[]): string {
     const opt = (r: string, label: string) => `<button type="button" role="radio" data-range="${r}" aria-checked="${wk.range === r}" tabindex="${wk.range === r ? 0 : -1}">${label}</button>`;
-    return `<header class="wk-head"><h2 class="wk-title">${rangeLabel(days)}</h2>${wk.mode === 'hours' ? '<span class="wk-hint">Click a time to add a task</span>' : ''}
+    return `<header class="wk-head"><h2 class="wk-title">${rangeLabel(days)}</h2>${wk.mode === 'hours' ? '<span class="wk-hint">Click or drag on a time to add a task</span>' : ''}
       <div class="wk-seg" role="radiogroup" aria-label="Days shown">${opt('next', 'Next 7 days')}${opt('week', 'This week')}</div></header>`;
   }
 
   // ---------- Hours
+  const evHeight = (len: number): number => Math.max(18, len / 60 * HH - 2);
+  const ghostHtml = (y: number, len: number, text: string): string =>
+    `<div class="hv-ghost${len < 45 ? ' short' : ''}" style="top:${y + 1}px;height:${evHeight(len)}px"><span>New task</span><span class="mono">${text}</span></div>`;
   function hours(days: Day[]): string {
-    const timed = days.flatMap(d => d.items.filter(i => i.time).map(i => toMin(i.time ?? '')));
-    const h0 = Math.min(7, ...timed.map(m => Math.floor(m / 60))), h1 = Math.max(22, ...timed.map(m => Math.floor(m / 60) + 1));
+    const timed = days.flatMap(d => d.items.filter(i => i.time).map(i => [toMin(i.time ?? ''), toMin(i.time ?? '') + lengthOf(i)]));
+    const h0 = Math.min(7, ...timed.map(([a]) => Math.floor(a / 60))), h1 = Math.min(24, Math.max(22, ...timed.map(([, b]) => Math.ceil(b / 60))));
     const top = (m: number): number => (m - h0 * 60) / 60 * HH;
     const lines = (d: Day) => [...new Set(d.items.filter(i => !i.time).map(i => i.line))];
     let h = `<div class="hv${wk.tray ? ' tray-open' : ''}" style="--hh:${HH}px;--rows:${h1 - h0}"><div class="hv-scroll" data-scroll><div class="hv-grid" data-h0="${h0}">`;
@@ -95,15 +102,24 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
     h += '</div>';
     days.forEach(d => {
       h += `<div class="hv-col ${d.rel}"${d.rel === 'past' ? '' : ` data-col-day="${d.day}"`}>`;
-      if (compose && compose.day === d.day && compose.time) h += `<div class="hv-ghost" style="top:${top(toMin(compose.time)) + 2}px"><span>New task</span><span class="mono">${compose.time}</span></div>`;
-      // tasks at the same time sit side by side
-      const evs = d.items.filter(i => i.time).sort((a, b) => toMin(a.time ?? '') - toMin(b.time ?? ''));
-      const lane: number[] = [], ends: number[] = [];
-      evs.forEach((e, i) => { const m = toMin(e.time ?? ''); let k = ends.findIndex(x => x <= m); if (k < 0) k = ends.length; ends[k] = m + 60; lane[i] = k; });
-      const lanes = Math.max(1, ends.length);
+      if (compose && compose.day === d.day && compose.time) h += ghostHtml(top(toMin(compose.time)), compose.duration ?? DEFAULT_MINS, timeRange(compose.time, compose.duration ?? DEFAULT_MINS));
+      // tasks that overlap share the width: each cluster of overlapping tasks splits into lanes
+      const evs = d.items.filter(i => i.time).sort((a, b) => toMin(a.time ?? '') - toMin(b.time ?? '') || lengthOf(b) - lengthOf(a));
+      const pos: { lane: number; of: number }[] = [];
+      let cluster: number[] = [], ends: number[] = [], cEnd = -1;
+      const flush = (): void => { cluster.forEach(i => { pos[i].of = Math.max(1, ends.length); }); cluster = []; ends = []; };
       evs.forEach((e, i) => {
-        h += itemTag(d, e, 'hv-ev', `<span class="tt">${esc(e.title)}</span><span class="tm mono">${e.time}</span>`,
-          `;top:${top(toMin(e.time ?? '')) + 2}px;left:calc(${lane[i]} * 100% / ${lanes} + 4px);width:calc(100% / ${lanes} - 8px)`);
+        const a = toMin(e.time ?? ''), b = a + lengthOf(e);
+        if (a >= cEnd) flush();
+        let k = ends.findIndex(x => x <= a); if (k < 0) k = ends.length;
+        ends[k] = b; pos[i] = { lane: k, of: 1 }; cluster.push(i); cEnd = Math.max(cEnd, b);
+      });
+      flush();
+      evs.forEach((e, i) => {
+        const len = lengthOf(e), { lane, of } = pos[i];
+        h += itemTag(d, e, `hv-ev${len < 45 ? ' short' : ''}`, `<span class="tt">${esc(e.title)}</span><span class="tm mono">${timeRange(e.time ?? '', len)}</span>`,
+          `;top:${top(toMin(e.time ?? '')) + 1}px;height:${evHeight(len)}px;left:calc(${lane} * 100% / ${of} + 3px);width:calc(100% / ${of} - 6px)`,
+          d.rel === 'past' ? '' : '<span class="hv-rs" aria-hidden="true"></span>');
       });
       if (d.rel === 'today') {
         const m = minutesOf(st.clock());
@@ -142,7 +158,7 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
       else if (p != null) path = `M${x(ds[p])} ${y(p)}V${y(i) - 8}Q${x(ds[p])} ${y(i)} ${x(ds[p]) + 8} ${y(i)}H${x(ds[i])}`;
       if (path) svg += `<path d="${path}" fill="none" stroke="${stroke}" stroke-width="3" stroke-linecap="round"${dash}/>`;
     });
-    const rows = its.map((it, i) => itemTag(d, it, 'dv-stop', `<span class="tt">${esc(it.title)}</span>${it.time ? `<span class="tm mono">${it.time}</span>` : ''}`, `;padding-left:${ds[i] * IND}px`)).join('');
+    const rows = its.map((it, i) => itemTag(d, it, 'dv-stop', `<span class="tt">${esc(it.title)}</span>${it.time ? `<span class="tm mono">${timeRange(it.time, it.duration)}</span>` : ''}`, `;padding-left:${ds[i] * IND}px`)).join('');
     return `<div class="dv-col" style="${vars(l)}"><h3><span class="ldot" style="background:${l.color}"></span>${esc(l.name)}<span class="mono">${doneCount(its)}</span></h3>
       <div class="dv-stops"><svg class="dv-track" width="100%" height="${its.length * RH}" aria-hidden="true">${svg}</svg>${rows}</div></div>`;
   }
@@ -199,10 +215,10 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
     const input = field<HTMLInputElement>('.wn-input'), whenEl = field('.wn-when'), listsEl = field('.wn-lists'), addBtn = field<HTMLButtonElement>('.wn-add');
     if (!compose || !input || !whenEl || !listsEl || !addBtn) return;
     const p = parse(input.value.trim(), parseContext(st.plan, st.today));
-    const { date, time } = slotSchedule(p, compose, st.today);
+    const { date, time, duration } = slotSchedule(p, compose, st.today);
     const line = p.lineGuess && compose.line ? compose.line : p.line;
     const day = p.someday ? 'Someday' : p.repeat ? repeatShort(p.repeat) : `${niceDate(date ?? st.today, st.today)}${date && niceDate(date, st.today).length < 4 ? ' ' + parseYmd(date).getDate() : ''}`;
-    whenEl.innerHTML = `${icon(p.repeat ? 'repeat' : 'calendar', 14)}<span>${esc(day)}</span>${time ? `<span class="mono">${time}</span>` : '<span class="any">Anytime</span>'}`;
+    whenEl.innerHTML = `${icon(p.repeat ? 'repeat' : 'calendar', 14)}<span>${esc(day)}</span>${time ? `<span class="mono">${timeRange(time, duration ?? DEFAULT_MINS)}</span>` : '<span class="any">Anytime</span>'}`;
     listsEl.innerHTML = listsHtml(line);
     addBtn.disabled = !p.title;
   }
@@ -251,19 +267,34 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
     box.innerHTML = `<input class="wn-input" type="text" data-f="title" autocomplete="off" spellcheck="false" aria-label="Name">
       <div class="wn-row">
         <label class="wn-f"><span>Day</span><input type="date" data-f="date" min="${st.today}" value="${date}"${t.repeat && t.repeat.type !== 'weekly' ? ' disabled' : ''}></label>
-        <label class="wn-f"><span>Time</span><span class="wn-time"><input type="time" data-f="time" step="300" value="${t.time ?? ''}"><button type="button" data-act="anytime" title="No set time">Anytime</button></span></label>
+        <label class="wn-f"><span>Repeats</span><select data-f="repeat">${repeatOptions(t.repeat)}</select></label>
       </div>
-      <label class="wn-f"><span>Repeats</span><select data-f="repeat">${repeatOptions(t.repeat)}</select></label>
+      <div class="wn-f"><span>Time</span><span class="wn-time">
+        <input type="time" data-f="time" step="300" value="${t.time ?? ''}" aria-label="Starts">
+        <span class="wn-to">to</span>
+        <input type="time" data-f="end" step="300" value="${t.time ? hhmm(Math.min(DAY_END - 1, toMin(t.time) + (t.duration ?? DEFAULT_MINS))) : ''}" aria-label="Ends">
+        <button type="button" data-act="anytime" title="No set time">Anytime</button></span><span class="wn-len"></span></div>
       <div class="wn-lists" role="radiogroup" aria-label="List">${listsHtml(t.line)}</div>
       <div class="wn-foot"><button type="button" class="wn-del" data-act="delete">Delete</button><button class="wn-add" type="button" data-act="save">Save</button></div>`;
     const title = field<HTMLInputElement>('[data-f="title"]'); if (title) title.value = t.title;
+    editLen = t.duration ?? DEFAULT_MINS;
     syncTime();
     box.hidden = false; place();
     title?.focus({ preventScroll: true }); title?.select();
   }
-  function syncTime(): void {
-    const time = field<HTMLInputElement>('[data-f="time"]'), any = field('[data-act="anytime"]');
-    any?.classList.toggle('on', !time?.value);
+  /** Editor times: Anytime lights up with no start; the end follows the start (keeping the length) and shows the length. */
+  let editLen = DEFAULT_MINS;
+  function syncTime(changed?: 'time' | 'end'): void {
+    const start = field<HTMLInputElement>('[data-f="time"]'), end = field<HTMLInputElement>('[data-f="end"]'), any = field('[data-act="anytime"]'), len = field('.wn-len');
+    if (!start || !end) return;
+    if (changed === 'time' && start.value) end.value = hhmm(Math.min(DAY_END - 1, toMin(start.value) + editLen));
+    if (changed === 'end' && start.value && end.value && toMin(end.value) > toMin(start.value)) editLen = toMin(end.value) - toMin(start.value);
+    if (start.value && !end.value) end.value = hhmm(Math.min(DAY_END - 1, toMin(start.value) + editLen));
+    any?.classList.toggle('on', !start.value);
+    end.disabled = !start.value;
+    if (!start.value) end.value = '';
+    const n = start.value && end.value ? toMin(end.value) - toMin(start.value) : 0;
+    if (len) len.textContent = !start.value ? '' : n > 0 ? (n < 60 ? `${n} min` : n % 60 ? `${Math.floor(n / 60)}h ${n % 60}m` : `${n / 60}h`) : 'Ends before it starts';
   }
   function save(): void {
     if (!editing) return;
@@ -274,7 +305,9 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
     const repeat: Repeat | null = kind === 'daily' ? { type: 'daily' } : kind === 'weekdays' ? { type: 'weekdays' }
       : kind === 'weekly' ? { type: 'weekly', days: t.repeat?.type === 'weekly' && (!date || t.repeat.days.includes(dow)) ? t.repeat.days : [dow] }
       : kind === 'every' ? { type: 'every', n: t.repeat?.type === 'every' ? t.repeat.n : 2 } : null;
-    const id = editing.id, e = { title: val('title'), line: editing.line, time: val('time') || null, date, repeat };
+    const time = val('time') || null, end = val('end');
+    const duration = time ? (end && toMin(end) > toMin(time) ? toMin(end) - toMin(time) : null) : t.duration ?? null;
+    const id = editing.id, e = { title: val('title'), line: editing.line, time, duration, date, repeat };
     closePop();
     app.edit(id, e);
   }
@@ -292,7 +325,7 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
     if (!t) { field<HTMLInputElement>('.wn-input')?.focus(); return; }
     closePop(); render();
   }
-  box.addEventListener('input', e => { if (compose && closestEl(e.target, '.wn-input')) preview(); if (closestEl(e.target, '[data-f="time"]')) syncTime(); });
+  box.addEventListener('input', e => { if (compose && closestEl(e.target, '.wn-input')) preview(); const f = closestEl(e.target, '[data-f]')?.dataset.f; if (f === 'time' || f === 'end') syncTime(f); });
   box.addEventListener('change', e => {
     const sel = closestEl(e.target, '[data-f="repeat"]');
     if (sel instanceof HTMLSelectElement) { const d = field<HTMLInputElement>('[data-f="date"]'); if (d) { d.disabled = sel.value !== 'none' && sel.value !== 'weekly'; if (!d.disabled && !d.value) d.value = st.today; } }
@@ -312,6 +345,7 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
     if (act === 'add') submit();
     if (act === 'save') save();
     if (act === 'anytime') { const time = field<HTMLInputElement>('[data-f="time"]'); if (time) time.value = ''; syncTime(); }
+    if (act === 'anytime-off') syncTime();
     if (act === 'delete' && editing) { const id = editing.id; closePop(); app.move(id, 'delete'); }
   });
   document.addEventListener('pointerdown', e => { if ((compose || editing) && !box.contains(e.target instanceof Node ? e.target : null)) closePop(); }, true);
@@ -323,7 +357,7 @@ export function createWeekView(store: Store, dom: Dom, app: App) {
     const day = col.dataset.colDay, h0 = Number(col.closest<HTMLElement>('[data-h0]')?.dataset.h0 ?? 0);
     if (!day) return null;
     const m = Math.min(23 * 60 + 30, h0 * 60 + Math.max(0, Math.floor((clientY - col.getBoundingClientRect().top) / (HH / 2))) * 30);
-    return { day, time: `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}` };
+    return { day, time: hhmm(m) };
   }
 
   function setMode(m: Mode, opts: { focus?: boolean } = {}): void {

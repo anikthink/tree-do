@@ -87,16 +87,17 @@ describe('the done-log', () => {
 });
 
 describe('slotSchedule (adding on the week)', () => {
-  const words = { repeat: null, date: null, time: null, someday: false };
+  const words = { repeat: null, date: null, time: null, duration: null, someday: false };
   it('takes the slot\'s day and time', () => {
-    expect(slotSchedule(words, { day: SAT, time: '14:30' }, WED)).toEqual({ date: SAT, time: '14:30' });
-    expect(slotSchedule(words, { day: SAT, time: null }, WED)).toEqual({ date: SAT, time: null });
+    expect(slotSchedule(words, { day: SAT, time: '14:30', duration: 90 }, WED)).toEqual({ date: SAT, time: '14:30', duration: 90 });
+    expect(slotSchedule(words, { day: SAT, time: null }, WED)).toEqual({ date: SAT, time: null, duration: null });
   });
   it('today needs no date (a one-off with none is today\'s)', () => {
-    expect(slotSchedule(words, { day: WED, time: '09:00' }, WED)).toEqual({ date: null, time: '09:00' });
+    expect(slotSchedule(words, { day: WED, time: '09:00' }, WED)).toEqual({ date: null, time: '09:00', duration: null });
   });
   it('the words win: a typed time, a repeat, a day or someday', () => {
-    expect(slotSchedule({ ...words, time: '15:00' }, { day: SAT, time: '09:00' }, WED).time).toBe('15:00');
+    expect(slotSchedule({ ...words, time: '15:00' }, { day: SAT, time: '09:00', duration: 60 }, WED)).toMatchObject({ time: '15:00', duration: null });
+    expect(slotSchedule({ ...words, duration: 45 }, { day: SAT, time: '09:00', duration: 60 }, WED)).toMatchObject({ time: '09:00', duration: 45 });
     expect(slotSchedule({ ...words, repeat: { type: 'daily' } }, { day: SAT, time: null }, WED).date).toBeNull();
     expect(slotSchedule({ ...words, date: SUN }, { day: SAT, time: null }, WED).date).toBe(SUN);
     expect(slotSchedule({ ...words, someday: true }, { day: SAT, time: null }, WED).date).toBeNull();

@@ -20,6 +20,8 @@ export interface App {
   resetDemo(): void;
   /** Change a task from the week's editor. */
   edit(id: string, e: TaskEdit): void;
+  /** Moved or stretched on the week's grid. */
+  reschedule(id: string, day: string, time: string, duration: number): void;
   /** Add a task typed into a slot on the week (null if there was nothing to add). */
   addAt(text: string, slot: Slot, line: string | null): Task | null;
   // sheet + views

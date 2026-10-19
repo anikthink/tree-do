@@ -116,7 +116,7 @@ export function createPlanView(store: Store, dom: Dom, app: App) {
     if (el.classList.contains('rule')) {
       const v = el.value.trim().toLowerCase();
       const p = parse('x ' + v, parseContext(plan, st.today));
-      t.repeat = p.repeat; t.time = p.time; t.someday = p.someday; t.date = p.date; t.skip = null; t.anchor = p.anchor && t.line === 'up';
+      t.repeat = p.repeat; t.time = p.time; t.duration = p.duration; t.someday = p.someday; t.date = p.date; t.skip = null; t.anchor = p.anchor && t.line === 'up';
       if (/^once\b/.test(v)) { t.repeat = null; }
       app.replan({ instant: true });
     }

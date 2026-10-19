@@ -1,6 +1,6 @@
 // The plain-words parser ("stretch daily 9am #health") and the rule text shown in the plan.
 import { allLines } from './lines';
-import { DOW, DOW_LONG, addDays, diffDays, niceDate, pad2, parseYmd } from './time';
+import { DOW, DOW_LONG, addDays, diffDays, durationText, hhmm, niceDate, pad2, parseYmd, timeRange, toMin } from './time';
 import type { Where } from './rules';
 import type { Line, Plan, Repeat, Task } from './types';
 
@@ -21,6 +21,8 @@ export interface Parsed {
   line: string;
   repeat: Repeat | null;
   time: string | null;
+  /** Minutes, from a range ("3-5pm") or a length ("for 45 min"). */
+  duration: number | null;
   date: string | null;
   someday: boolean;
   anchor: boolean;
@@ -63,7 +65,7 @@ const dowIndex = (w: string): number => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri
 
 export function parse(input: string, ctx: ParseContext): Parsed {
   let s = ' ' + input + ' ';
-  const out: Parsed = { title: '', line: '', repeat: null, time: null, date: null, someday: false, anchor: false, lineGuess: false, place: null };
+  const out: Parsed = { title: '', line: '', repeat: null, time: null, duration: null, date: null, someday: false, anchor: false, lineGuess: false, place: null };
   // first, so the task's name can't be read as a day or time ("after sunday reset")
   const found = findPlace(input, ctx);
   if (found) { out.place = found.place; s = s.replace(found.phrase, ' '); }
@@ -89,13 +91,37 @@ export function parse(input: string, ctx: ParseContext): Parsed {
   }) ||
   take(/\s(weekly|every\s+week)\b/i, () => { out.repeat = { type: 'weekly', days: [parseYmd(ctx.today).getDay()] }; });
   take(/\s(first thing|starts? the day|to start the day)\b/i, () => { out.anchor = true; });
-  // time
-  take(/\s(?:at\s+)?(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/i, m => {
-    let h = +m[1] % 12; if (m[3].toLowerCase() === 'pm') h += 12; out.time = `${pad2(h)}:${pad2(+(m[2] || 0))}`;
-  }) ||
-  take(/\s(?:at\s+)?([01]?\d|2[0-3])[:.]([0-5]\d)\b/i, m => { out.time = `${pad2(+m[1])}:${m[2]}`; }) ||
-  take(/\sat\s+(\d{1,2})\b/i, m => { let h = +m[1]; if (h < 7) h += 12; out.time = `${pad2(h)}:00`; }) ||
-  take(/\s(noon|midday)\b/i, () => { out.time = '12:00'; });
+  // a time range: "3-5pm", "11-1pm", "9am to 11", "14:00–16:30" (needs am/pm or minutes, so "3-4 boxes" stays words)
+  const H = '(\\d{1,2})(?:[:.](\\d{2}))?\\s*(am|pm)?';
+  const rm = s.match(new RegExp(`\\s(?:from\\s+)?${H}\\s*(?:-|–|—|to|until|till)\\s*${H}(?=\\s)`, 'i'));
+  if (rm && (rm[2] || rm[3] || rm[5] || rm[6])) {
+    const ap1 = rm[3]?.toLowerCase(), ap2 = rm[6]?.toLowerCase(), other = (ap: string): string => (ap === 'pm' ? 'am' : 'pm');
+    const to24 = (h: number, ap?: string): number => (ap ? (h % 12) + (ap === 'pm' ? 12 : 0) : h);
+    const m1 = +(rm[2] || 0), m2 = +(rm[5] || 0);
+    let h1 = to24(+rm[1], ap1 ?? ap2), h2 = to24(+rm[4], ap2 ?? ap1);
+    if (!ap1 && ap2 && h1 * 60 + m1 >= h2 * 60 + m2) h1 = to24(+rm[1], other(ap2));      // "11-1pm": 11am
+    if (!ap2 && ap1 && h2 * 60 + m2 <= h1 * 60 + m1) h2 = to24(+rm[4], other(ap1));      // "11am to 1": 1pm
+    const a = h1 * 60 + m1, b = h2 * 60 + m2;
+    if (h1 < 24 && h2 <= 24 && m1 < 60 && m2 < 60) {
+      out.time = hhmm(a); out.duration = b > a ? b - a : null;
+      s = s.replace(rm[0], ' ');
+    }
+  }
+  // a length: "for 45 min", "for 2h", "for 1h 30m", "for an hour", "for half an hour"
+  const mins = (n: number): number => Math.max(5, Math.min(24 * 60, Math.round(n)));
+  take(/\sfor\s+half\s+an?\s+hour\b/i, () => { out.duration = 30; }) ||
+  take(/\sfor\s+(?:an?|one)\s+hour\b/i, () => { out.duration = 60; }) ||
+  take(/\sfor\s+(\d+(?:\.\d+)?)\s*(?:h|hrs?|hours?)(?:\s*(\d+)\s*(?:m|mins?|minutes?))?\b/i, m => { out.duration = mins(+m[1] * 60 + +(m[2] || 0)); }) ||
+  take(/\sfor\s+(\d+)\s*(?:m|mins?|minutes?)\b/i, m => { out.duration = mins(+m[1]); });
+  // time (unless a range already gave one)
+  if (!out.time) {
+    take(/\s(?:at\s+)?(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/i, m => {
+      let h = +m[1] % 12; if (m[3].toLowerCase() === 'pm') h += 12; out.time = `${pad2(h)}:${pad2(+(m[2] || 0))}`;
+    }) ||
+    take(/\s(?:at\s+)?([01]?\d|2[0-3])[:.]([0-5]\d)\b/i, m => { out.time = `${pad2(+m[1])}:${m[2]}`; }) ||
+    take(/\sat\s+(\d{1,2})\b/i, m => { let h = +m[1]; if (h < 7) h += 12; out.time = `${pad2(h)}:00`; }) ||
+    take(/\s(noon|midday)\b/i, () => { out.time = '12:00'; });
+  }
   // day
   const today = ctx.today;
   take(/\s(someday|some day|eventually|one day)\b/i, () => { out.someday = true; }) ||
@@ -138,7 +164,8 @@ export function ruleText(t: Task, today: string): string {
   if (t.someday) bits.push('Someday');
   else if (t.repeat) bits.push(repeatShort(t.repeat));
   else bits.push(t.date && t.date > today ? niceDate(t.date, today) : 'Once');
-  if (t.time) bits.push(t.time);
+  if (t.time) bits.push(timeRange(t.time, t.duration));
+  else if (t.duration) bits.push(durationText(t.duration));
   if (t.anchor) bits.push('Starts the day');
   if (t.repeat && t.skip === today) bits.push('Skipped today');
   if (!t.repeat && t.doneOn) bits.push('Done');
@@ -155,7 +182,8 @@ export function ruleSource(t: Task, today: string): string {
       : 'every ' + (r.days || []).map(d => DOW_LONG[d]).join(' and '));
   } else if (t.date && t.date > today) bits.push(diffDays(t.date, today) === 1 ? 'tomorrow' : 'on ' + DOW_LONG[parseYmd(t.date).getDay()]);
   else bits.push('once');
-  if (t.time) bits.push(t.time);
+  if (t.time) bits.push(t.duration ? `${t.time}-${hhmm(Math.min(24 * 60, toMin(t.time) + t.duration))}` : t.time);
+  else if (t.duration) bits.push('for ' + durationText(t.duration).replace(' min', 'min'));
   if (t.anchor) bits.push('first thing');
   return bits.join(' ');
 }

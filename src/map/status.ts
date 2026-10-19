@@ -1,6 +1,6 @@
 // How a station reads right now (drawn state, countdown, meta text). Shared by the map and the panel.
 import { repeatShort } from '../domain/parse';
-import { minutesOf, toMin } from '../domain/time';
+import { minutesOf, timeRange, toMin } from '../domain/time';
 import type { AppState } from '../app/store';
 import type { Station } from './layout';
 
@@ -20,7 +20,7 @@ export interface MetaBit { v: string; mono?: boolean }
 export function metaBits(s: Station): MetaBit[] {
   const t = s.t; if (!t) return [];
   const bits: MetaBit[] = [];
-  if (t.time) bits.push({ v: t.time, mono: true });
+  if (t.time) bits.push({ v: timeRange(t.time, t.duration), mono: true });
   if (t.repeat) bits.push({ v: repeatShort(t.repeat) });
   return bits;
 }

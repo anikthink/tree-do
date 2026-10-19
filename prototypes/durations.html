@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree-do · Start and end times, five directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --text:#1C2430; --text-2:#3F4856; --muted:#6B7480; --faint:#B4BBC5; --hair:#E8EAEE; --hair-2:#F0F2F5;
+    --fill:#F4F6F9; --fill-2:#ECEFF3; --lock:#C5CBD3;
+    --accent:#2F7CF6; --accent-ink:#1F62D0; --accent-tint:#EAF2FF;
+    --e1:0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.08);
+    --ease:cubic-bezier(.22,.8,.3,1); --t:200ms; --hh:44px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--fill); color: var(--text); font-family: 'Figtree', sans-serif; font-size: 14px; -webkit-font-smoothing: antialiased; }
+  button, input, select { font: inherit; color: inherit; }
+  button { background: none; border: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .mono { font-family: 'Geist Mono', monospace; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .ldot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 44px 28px 96px; }
+  .intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+  .intro h1 { font-size: 26px; font-weight: 700; }
+  .intro p { color: var(--muted); font-size: 14.5px; line-height: 1.5; margin-top: 6px; max-width: 640px; }
+  .jump { display: flex; gap: 4px; padding: 3px; background: #fff; border: 1px solid var(--hair); border-radius: 10px; }
+  .jump a { height: 30px; padding: 0 11px; border-radius: 8px; display: grid; place-items: center; font-size: 13.5px; font-weight: 500; color: var(--muted); text-decoration: none; }
+  .jump a:hover { background: var(--fill); color: var(--text); }
+  .opt { margin-top: 56px; scroll-margin-top: 20px; }
+  .opt-head { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; align-items: baseline; margin-bottom: 14px; }
+  .opt-head h2 { font-size: 19px; font-weight: 700; }
+  .opt-head h2 small { font-size: 13.5px; font-weight: 500; color: var(--muted); margin-right: 8px; }
+  .opt-head p { grid-column: 1; color: var(--text-2); font-size: 14px; line-height: 1.55; max-width: 720px; }
+  .opt-head dl { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: auto auto; gap: 3px 12px; font-size: 12.5px; align-self: end; }
+  .opt-head dt { color: var(--muted); } .opt-head dd { color: var(--text-2); font-weight: 500; }
+  .try { margin-top: 6px; font-size: 12.5px; color: var(--muted); grid-column: 1; }
+  .try b { color: var(--text-2); font-weight: 600; }
+  .wrap { overflow-x: auto; border-radius: 16px; }
+  .frame { position: relative; width: 1124px; background: #fff; border: 1px solid var(--hair); border-radius: 16px; overflow: hidden; display: flex; }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .bar { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 16px; border-bottom: 1px solid var(--hair); }
+  .bar b { font-size: 14px; } .bar .sub { font-size: 12px; color: var(--muted); }
+  .bar .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+  /* the shared grid */
+  .grid { position: relative; display: grid; grid-template-columns: 52px repeat(var(--n), 1fr); }
+  .dh { height: 52px; padding: 7px 10px; border-left: 1px solid var(--hair-2); border-bottom: 1px solid var(--hair); }
+  .dh span { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+  .dh b { font-family: 'Geist Mono', monospace; font-weight: 400; font-size: 17px; }
+  .dh.today span { color: var(--accent-ink); font-weight: 600; }
+  .dh.today b { display: inline-grid; place-items: center; min-width: 28px; height: 22px; padding: 0 5px; border-radius: 7px; background: var(--text); color: #fff; font-size: 14px; }
+  .gut { position: relative; }
+  .gut span { position: absolute; right: 8px; transform: translateY(-50%); font-size: 10.5px; color: var(--muted); font-family: 'Geist Mono', monospace; }
+  .col { position: relative; border-left: 1px solid var(--hair-2); height: calc(var(--hh) * var(--rows));
+    background-image: repeating-linear-gradient(to bottom, transparent 0 calc(var(--hh) - 1px), var(--hair-2) calc(var(--hh) - 1px) var(--hh)); }
+  .col.free { cursor: cell; }
+  .ev { position: absolute; left: 3px; right: 3px; border-radius: 8px; background: var(--tint); color: var(--tx); padding: 4px 8px; overflow: hidden;
+    font-size: 12px; font-weight: 600; line-height: 1.25; text-align: left; user-select: none; transition: box-shadow var(--t) var(--ease); }
+  .ev .tm { display: block; font-family: 'Geist Mono', monospace; font-weight: 400; font-size: 10.5px; color: var(--muted); }
+  .ev.short { display: flex; align-items: center; gap: 6px; padding-top: 0; padding-bottom: 0; }
+  .ev.short .tm { display: inline; }
+  .ev .tt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev:hover { box-shadow: inset 0 0 0 1px var(--c), var(--e1); }
+  .ev.sel { box-shadow: inset 0 0 0 2px var(--c), var(--e1); }
+  .ev.ghost { background: var(--accent-tint); color: var(--accent-ink); box-shadow: inset 0 0 0 1.5px var(--accent); pointer-events: none; }
+  .now { position: absolute; left: -1px; right: 0; height: 2px; background: var(--text); z-index: 2; pointer-events: none; }
+  .now::before { content: ''; position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--text); }
+
+  .pop { position: absolute; z-index: 10; width: 280px; padding: 12px; background: #fff; border: 1px solid var(--hair); border-radius: 12px; box-shadow: var(--e1); animation: rise var(--t) var(--ease); }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .pop h4 { font-size: 13.5px; font-weight: 700; }
+  .pop .when { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .pop .when .mono { color: var(--text); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+  .chip { height: 28px; padding: 0 10px; border-radius: 7px; background: var(--fill); font-size: 12.5px; font-weight: 500; color: var(--text-2); transition: background var(--t) var(--ease); }
+  .chip:hover { background: var(--fill-2); }
+  .chip[aria-pressed="true"] { background: var(--text); color: #fff; font-weight: 600; }
+  .lbl { display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin: 10px 0 4px; }
+  .tinput { height: 32px; padding: 0 8px; border: 1px solid var(--hair); border-radius: 7px; font-family: 'Geist Mono', monospace; font-size: 12.5px; outline: none; }
+  .tinput:focus, .txt:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,124,246,.16); }
+  .row { display: flex; align-items: center; gap: 6px; }
+  .txt { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--hair); border-radius: 9px; font-size: 13.5px; outline: none; }
+  .note { font-size: 12px; color: var(--muted); }
+  .btn { height: 30px; padding: 0 12px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 600; }
+  .btn.quiet { background: var(--fill); color: var(--text-2); }
+  .step { width: 30px; height: 30px; border-radius: 8px; background: var(--fill); font-size: 16px; font-weight: 600; color: var(--text-2); display: grid; place-items: center; }
+  .step:hover { background: var(--fill-2); }
+
+  /* 1 · drag */
+  .rs { position: absolute; left: 0; right: 0; bottom: 0; height: 7px; cursor: ns-resize; }
+  .rs::after { content: ''; position: absolute; left: 50%; bottom: 2px; width: 18px; height: 3px; margin-left: -9px; border-radius: 2px; background: var(--c); opacity: 0; transition: opacity var(--t); }
+  .ev:hover .rs::after { opacity: .6; }
+  .o1 .ev { cursor: grab; }
+
+  /* 3 · typed */
+  .typebar { padding: 10px 16px; border-bottom: 1px solid var(--hair); display: flex; gap: 10px; align-items: center; }
+  .typebar .txt { flex: 1; }
+  .parsed { display: flex; gap: 4px; min-height: 22px; align-items: center; padding: 0 16px 10px; border-bottom: 1px solid var(--hair); margin-top: -2px; }
+  .pchip { height: 22px; padding: 0 7px; border-radius: 6px; background: var(--fill); font-size: 11.5px; font-weight: 500; color: var(--text-2); display: inline-flex; align-items: center; gap: 4px; }
+  .pchip.mono { font-size: 11px; }
+
+  /* 4 · estimate first */
+  .tray { width: 250px; flex: none; border-right: 1px solid var(--hair); background: #FBFBFC; display: flex; flex-direction: column; }
+  .tray h3 { font-size: 13px; font-weight: 700; padding: 16px 14px 2px; }
+  .tray p { font-size: 12px; color: var(--muted); padding: 0 14px 8px; line-height: 1.4; }
+  .card { margin: 0 10px 6px; padding: 8px 10px; background: #fff; border: 1px solid var(--hair); border-radius: 10px; cursor: grab; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+  .card:hover { box-shadow: var(--e1); }
+  .card .len { margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--muted); background: var(--fill); padding: 2px 6px; border-radius: 5px; }
+  .lenbar { height: 4px; border-radius: 2px; background: var(--tint); margin: -2px 10px 8px; overflow: hidden; }
+  .lenbar i { display: block; height: 100%; background: var(--c); border-radius: 2px; }
+  .col.over { background-color: var(--accent-tint); }
+
+  /* 5 · budget */
+  .budget { padding: 8px 10px 10px; border-left: 1px solid var(--hair-2); border-bottom: 1px solid var(--hair); }
+  .budget .mtr { height: 6px; border-radius: 3px; background: var(--fill-2); overflow: hidden; display: flex; gap: 1px; }
+  .budget .mtr i { display: block; height: 100%; }
+  .budget .t { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .budget .t b { font-weight: 600; color: var(--text-2); }
+  .budget.full .t b { color: var(--text); }
+  .side { width: 280px; flex: none; border-left: 1px solid var(--hair); padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .side h3 { font-size: 13px; font-weight: 700; }
+  .side .empty { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
+  .big { font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 300; letter-spacing: -.02em; margin: 6px 0 2px; }
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="intro">
+    <div>
+      <h1>Start and end times</h1>
+      <p>Five ways a task could take up time on the Hours view, from 15 minutes to 4 hours. They all use the same three days and the same tasks. Each one works, so try it in place.</p>
+    </div>
+    <nav class="jump" aria-label="Jump to a direction"><a href="#o1">Drag</a><a href="#o2">Quick lengths</a><a href="#o3">Type it</a><a href="#o4">Estimate first</a><a href="#o5">Day budget</a></nav>
+  </header>
+
+  <section class="opt" id="o1">
+    <div class="opt-head"><h2><small>1</small>Drag</h2>
+      <p>Like Google Calendar. Drag down an empty column to make a task as long as you drag. Drag a task to move it, and drag its bottom edge to make it longer or shorter. Everything snaps to 15 minutes.</p>
+      <dl><dt>Feels like</dt><dd>Google / Apple Calendar</dd><dt>Weak spot</dt><dd>Fiddly on phones</dd></dl>
+      <p class="try"><b>Try:</b> drag on empty time · drag a task · drag a task's bottom edge</p></div>
+    <div class="wrap"><div class="frame o1" id="f1"></div></div>
+  </section>
+
+  <section class="opt" id="o2">
+    <div class="opt-head"><h2><small>2</small>Quick lengths</h2>
+      <p>Tap a time and pick how long from a row of chips: 15m, 30m, 45m, 1h, 2h, 4h. Tapping a task brings the same chips back. You never drag, so it works the same with a mouse, a finger or the keyboard.</p>
+      <dl><dt>Feels like</dt><dd>A timer app</dd><dt>Weak spot</dt><dd>Odd lengths need "Other"</dd></dl>
+      <p class="try"><b>Try:</b> click a task, then a length · click empty time</p></div>
+    <div class="wrap"><div class="frame" id="f2"></div></div>
+  </section>
+
+  <section class="opt" id="o3">
+    <div class="opt-head"><h2><small>3</small>Type it</h2>
+      <p>Write the length the way you'd say it, in the add field you already use: <code>dentist 3-4:30pm thu</code>, <code>call mum 6pm for 20 min</code>. Clicking a task shows exact <b>Start</b> and <b>End</b> fields and works out the length.</p>
+      <dl><dt>Feels like</dt><dd>Tree-do's add field</dd><dt>Weak spot</dt><dd>You have to know the syntax</dd></dl>
+      <p class="try"><b>Try:</b> type and press Enter · click a task to edit its start and end</p></div>
+    <div class="wrap"><div class="frame" id="f3"></div></div>
+  </section>
+
+  <section class="opt" id="o4">
+    <div class="opt-head"><h2><small>4</small>Estimate first</h2>
+      <p>Say how long something takes before deciding when. Tasks with an estimate wait on the left, each with a bar showing its length. Drag one onto the grid and it takes up exactly that much time, which is time-blocking.</p>
+      <dl><dt>Feels like</dt><dd>Time-blocking planners</dd><dt>Weak spot</dt><dd>Two places to look</dd></dl>
+      <p class="try"><b>Try:</b> drag a card from the left onto a day</p></div>
+    <div class="wrap"><div class="frame" id="f4"></div></div>
+  </section>
+
+  <section class="opt" id="o5">
+    <div class="opt-head"><h2><small>5</small>Day budget</h2>
+      <p>Each day shows how much of it is already planned, split by list, against a set number of planned hours. Select a task and use <b>−15</b> / <b>+15</b> to change its length. The day tells you when you've planned more than fits.</p>
+      <dl><dt>Feels like</dt><dd>A spending budget</dd><dt>Weak spot</dt><dd>Less direct than dragging</dd></dl>
+      <p class="try"><b>Try:</b> click a task, then use −15 / +15 · watch the day's meter</p></div>
+    <div class="wrap"><div class="frame" id="f5"></div></div>
+  </section>
+</main>
+
+<script>
+// ---------- shared data: three days, Tree-do's lists ----------
+const LINES = {
+  up: { name: 'Upkeep', c: '#5B6B7F', tx: '#4A5868', tint: '#EFF0F2' },
+  l1: { name: 'Work', c: '#2F7CF6', tx: '#1F62D0', tint: '#EAF2FF' },
+  l2: { name: 'Health', c: '#14A38B', tx: '#0B7563', tint: '#E8F6F3' },
+  l3: { name: 'Home move', c: '#F2645A', tx: '#C13D33', tint: '#FDF0EF' },
+};
+const DAYS = [{ n: 'Today', d: 19 }, { n: 'Tomorrow', d: 20 }, { n: 'Wed', d: 21 }];
+const H0 = 8, H1 = 20, HH = 44, NOW = 11 * 60 + 20, SNAP = 15;
+const seedTasks = () => [
+  { id: 'a', line: 'up', title: 'Take meds', day: 0, s: 8 * 60, len: 15 },
+  { id: 'b', line: 'l1', title: 'Team standup', day: 0, s: 10 * 60 + 30, len: 30 },
+  { id: 'c', line: 'l1', title: 'Deep work: report', day: 0, s: 13 * 60, len: 180 },
+  { id: 'd', line: 'l2', title: 'Stretch', day: 0, s: 18 * 60, len: 15 },
+  { id: 'e', line: 'up', title: 'Take meds', day: 1, s: 8 * 60, len: 15 },
+  { id: 'f', line: 'l3', title: 'Pack the kitchen', day: 1, s: 9 * 60 + 30, len: 120 },
+  { id: 'g', line: 'l2', title: 'Dentist', day: 1, s: 15 * 60, len: 45 },
+  { id: 'h', line: 'up', title: 'Take meds', day: 2, s: 8 * 60, len: 15 },
+  { id: 'i', line: 'l1', title: 'Team standup', day: 2, s: 10 * 60 + 30, len: 30 },
+  { id: 'j', line: 'l3', title: 'Movers arrive', day: 2, s: 12 * 60, len: 240 },
+];
+const pad = n => String(n).padStart(2, '0');
+const hm = m => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+const range = (s, len) => `${hm(s)}–${hm(s + len)}`;
+const lenText = m => m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m / 60}h`;
+const vars = l => `--c:${LINES[l].c};--tx:${LINES[l].tx};--tint:${LINES[l].tint}`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const topOf = m => (m - H0 * 60) / 60 * HH;
+const minAt = (col, y) => H0 * 60 + (y - col.getBoundingClientRect().top) / HH * 60;
+const snap = (m, f = Math.round) => Math.max(H0 * 60, Math.min(H1 * 60, f(m / SNAP) * SNAP));
+let uid = 0;
+
+function evHtml(t, extra = '', sel = false) {
+  const h = Math.max(18, t.len / 60 * HH - 2), short = t.len < 45;
+  return `<div class="ev${short ? ' short' : ''}${sel ? ' sel' : ''}" data-id="${t.id}" style="${vars(t.line)};top:${topOf(t.s) + 1}px;height:${h}px" tabindex="0">
+    <span class="tt">${esc(t.title)}</span><span class="tm">${range(t.s, t.len)}</span>${extra}</div>`;
+}
+function gridHtml(tasks, opts = {}) {
+  let h = `<div class="grid" style="--n:${DAYS.length};--rows:${H1 - H0}"><div class="dh"></div>`;
+  h += DAYS.map((d, i) => `<div class="dh${i === 0 ? ' today' : ''}"><span>${d.n}</span><b>${d.d}</b></div>`).join('');
+  if (opts.above) h += opts.above();
+  h += '<div class="gut">' + Array.from({ length: H1 - H0 - 1 }, (_, i) => `<span style="top:${(i + 1) * HH}px">${pad(H0 + i + 1)}:00</span>`).join('') + '</div>';
+  DAYS.forEach((d, i) => {
+    h += `<div class="col${opts.free ? ' free' : ''}" data-day="${i}">`;
+    h += tasks.filter(t => t.day === i).map(t => evHtml(t, opts.extra ? opts.extra(t) : '', opts.sel === t.id)).join('');
+    if (i === 0) h += `<div class="now" style="top:${topOf(NOW)}px"></div>`;
+    h += '</div>';
+  });
+  return h + '</div>';
+}
+const bar = (title, right = '') => `<div class="bar"><b>${title}</b><span class="sub mono">19–21 Oct</span><div class="right">${right}</div></div>`;
+function popAt(frame, el, html) {
+  frame.querySelector('.pop')?.remove();
+  const p = document.createElement('div'); p.className = 'pop'; p.innerHTML = html; frame.appendChild(p);
+  const fr = frame.getBoundingClientRect(), r = el.getBoundingClientRect();
+  let left = r.right - fr.left + 8; if (left + 290 > fr.width) left = r.left - fr.left - 288;
+  p.style.left = Math.max(8, left) + 'px'; p.style.top = Math.min(Math.max(8, r.top - fr.top - 6), fr.height - p.offsetHeight - 8) + 'px';
+  return p;
+}
+
+// ================= 1 · Drag =================
+(() => {
+  const f = document.getElementById('f1'); let tasks = seedTasks(), drag = null;
+  const render = () => { f.innerHTML = `<div class="main">${bar('Hours', '<span class="sub">Snaps to 15 min</span>')}${gridHtml(tasks, { free: true, extra: () => '<span class="rs"></span>' })}</div>`; };
+  render();
+  f.addEventListener('pointerdown', e => {
+    const col = e.target.closest('.col'); if (!col || e.button) return;
+    const ev = e.target.closest('.ev'), m = minAt(col, e.clientY);
+    if (ev) { const t = tasks.find(x => x.id === ev.dataset.id);
+      drag = e.target.closest('.rs') ? { kind: 'size', t, el: ev } : { kind: 'move', t, el: ev, off: m - t.s }; }
+    else { const g = document.createElement('div'); g.className = 'ev ghost'; col.appendChild(g); drag = { kind: 'new', col, a: snap(m, Math.floor), g }; }
+    f.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  f.addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (drag.kind === 'new') {
+      const b = snap(minAt(drag.col, e.clientY)), s = Math.min(drag.a, b), en = Math.max(drag.a + SNAP, b);
+      drag.s = s; drag.len = en - s;
+      Object.assign(drag.g.style, { top: topOf(s) + 1 + 'px', height: Math.max(18, drag.len / 60 * HH - 2) + 'px' });
+      drag.g.innerHTML = `<span class="tt">New task</span><span class="tm">${range(s, drag.len)} · ${lenText(drag.len)}</span>`;
+    } else {
+      const cols = [...f.querySelectorAll('.col')];
+      const col = cols.find(c => { const r = c.getBoundingClientRect(); return e.clientX >= r.left && e.clientX < r.right; }) || drag.el.parentElement;
+      if (drag.kind === 'size') drag.t.len = Math.max(SNAP, snap(minAt(drag.el.parentElement, e.clientY)) - drag.t.s);
+      else { drag.t.s = Math.min(H1 * 60 - drag.t.len, snap(minAt(col, e.clientY) - drag.off)); drag.t.day = +col.dataset.day; }
+      render(); drag.el = f.querySelector(`[data-id="${drag.t.id}"]`);
+    }
+  });
+  f.addEventListener('pointerup', () => {
+    if (drag?.kind === 'new') {
+      if (drag.len) tasks.push({ id: 'n' + uid++, line: 'l1', title: 'New task', day: +drag.col.dataset.day, s: drag.s, len: drag.len });
+      else tasks.push({ id: 'n' + uid++, line: 'l1', title: 'New task', day: +drag.col.dataset.day, s: drag.a, len: 30 });
+      render();
+    }
+    drag = null;
+  });
+})();
+
+// ================= 2 · Quick lengths =================
+(() => {
+  const f = document.getElementById('f2'); let tasks = seedTasks(), sel = null;
+  const LENS = [15, 30, 45, 60, 120, 240];
+  const render = () => { f.innerHTML = `<div class="main">${bar('Hours')}${gridHtml(tasks, { free: true, sel: sel?.id })}</div>`; };
+  function open(t) {
+    sel = t; render();
+    const el = f.querySelector(`[data-id="${t.id}"]`);
+    const p = popAt(f, el, `<h4>${esc(t.title)}</h4><div class="when"><span class="mono">${range(t.s, t.len)}</span> · ${lenText(t.len)}</div>
+      <span class="lbl">How long?</span><div class="chips">${LENS.map(m => `<button class="chip" data-len="${m}" aria-pressed="${t.len === m}">${lenText(m).replace(' min', 'm')}</button>`).join('')}
+      <button class="chip" data-other aria-pressed="${!LENS.includes(t.len)}">Other</button></div>`);
+    p.addEventListener('click', e => {
+      const b = e.target.closest('[data-len]');
+      if (b) { t.len = Math.min(+b.dataset.len, H1 * 60 - t.s); open(t); }
+      if (e.target.closest('[data-other]')) { const v = prompt('Minutes?', t.len); if (v && +v > 0) { t.len = Math.min(+v, H1 * 60 - t.s); open(t); } }
+    });
+  }
+  render();
+  f.addEventListener('click', e => {
+    if (e.target.closest('.pop')) return;
+    const ev = e.target.closest('.ev'); if (ev) { open(tasks.find(t => t.id === ev.dataset.id)); return; }
+    const col = e.target.closest('.col');
+    if (col) { const t = { id: 'n' + uid++, line: 'l1', title: 'New task', day: +col.dataset.day, s: snap(minAt(col, e.clientY), Math.floor), len: 30 }; tasks.push(t); open(t); return; }
+    sel = null; render();
+  });
+})();
+
+// ================= 3 · Type it =================
+(() => {
+  const f = document.getElementById('f3'); let tasks = seedTasks(), sel = null;
+  const dayWord = { today: 0, tomorrow: 1, mon: 0, tue: 1, wed: 2 };
+  function parse(v) {
+    let s = ' ' + v + ' ', start = null, len = null, day = 0;
+    const r = s.match(/\s(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|–|to)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?=\s)/i);
+    const to24 = (h, ap) => ap ? h % 12 + (ap.toLowerCase() === 'pm' ? 12 : 0) : h;
+    if (r && (r[2] || r[3] || r[5] || r[6])) {
+      let a = to24(+r[1], r[3] || r[6]) * 60 + +(r[2] || 0), b = to24(+r[4], r[6] || r[3]) * 60 + +(r[5] || 0);
+      if (!r[3] && r[6] && a >= b) a -= 12 * 60;
+      start = a; len = b > a ? b - a : null; s = s.replace(r[0], ' ');
+    }
+    const l = s.match(/\sfor\s+(\d+(?:\.\d+)?)\s*(h|hours?|m|mins?|minutes?)\b/i);
+    if (l) { len = Math.round(+l[1] * (/^h/i.test(l[2]) ? 60 : 1)); s = s.replace(l[0], ' '); }
+    const t = s.match(/\s(\d{1,2})(?::(\d{2}))?\s*(am|pm)(?=\s)/i);
+    if (start == null && t) { start = to24(+t[1], t[3]) * 60 + +(t[2] || 0); s = s.replace(t[0], ' '); }
+    const d = s.match(/\s(today|tomorrow|mon|tue|wed)[a-z]*(?=\s)/i);
+    if (d) { day = dayWord[d[1].toLowerCase()]; s = s.replace(d[0], ' '); }
+    const title = s.replace(/\s+/g, ' ').trim();
+    return { title: title ? title[0].toUpperCase() + title.slice(1) : '', start, len, day };
+  }
+  const render = () => {
+    f.innerHTML = `<div class="main">${bar('Hours')}<div class="typebar"><input class="txt" id="t3" placeholder="dentist 3-4:30pm tomorrow  ·  call mum 6pm for 20 min" autocomplete="off"><button class="btn" id="t3b">Add</button></div>
+      <div class="parsed" id="t3p"><span class="note">Start, end and length show here as you type.</span></div>${gridHtml(tasks, { sel: sel?.id })}</div>`;
+    const inp = f.querySelector('#t3');
+    inp.addEventListener('input', () => {
+      const p = parse(inp.value), out = f.querySelector('#t3p');
+      out.innerHTML = !inp.value.trim() ? '<span class="note">Start, end and length show here as you type.</span>'
+        : `<span class="pchip">${esc(p.title || '…')}</span><span class="pchip">${DAYS[p.day].n}</span>${p.start != null ? `<span class="pchip mono">${range(p.start, p.len ?? 30)}</span>` : '<span class="pchip">Anytime</span>'}<span class="pchip">${p.len ? lenText(p.len) : p.start != null ? '30 min (default)' : 'no length'}</span>`;
+    });
+    const add = () => { const p = parse(inp.value); if (!p.title || p.start == null) { inp.focus(); return; }
+      tasks.push({ id: 'n' + uid++, line: 'l1', title: p.title, day: p.day, s: p.start, len: p.len ?? 30 }); render(); };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+    f.querySelector('#t3b').addEventListener('click', add);
+  };
+  render();
+  f.addEventListener('click', e => {
+    const ev = e.target.closest('.ev'); if (!ev) { if (!e.target.closest('.pop, .typebar')) { f.querySelector('.pop')?.remove(); } return; }
+    const t = tasks.find(x => x.id === ev.dataset.id); sel = t;
+    f.querySelectorAll('.ev.sel').forEach(x => x.classList.remove('sel')); ev.classList.add('sel');
+    const p = popAt(f, ev, `<h4>${esc(t.title)}</h4><span class="lbl">Time</span>
+      <div class="row"><input class="tinput" type="time" step="300" data-s value="${hm(t.s)}"><span class="note">to</span><input class="tinput" type="time" step="300" data-e value="${hm(t.s + t.len)}"></div>
+      <div class="note" style="margin-top:8px" data-len>${lenText(t.len)}</div><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn" data-save>Save</button></div>`);
+    const s = p.querySelector('[data-s]'), en = p.querySelector('[data-e]'), out = p.querySelector('[data-len]');
+    const toM = v => +v.slice(0, 2) * 60 + +v.slice(3, 5);
+    s.addEventListener('input', () => { en.value = hm(Math.min(H1 * 60, toM(s.value) + t.len)); out.textContent = lenText(toM(en.value) - toM(s.value)); });
+    en.addEventListener('input', () => { const n = toM(en.value) - toM(s.value); out.textContent = n > 0 ? lenText(n) : 'Ends before it starts'; });
+    p.querySelector('[data-save]').addEventListener('click', () => { const a = toM(s.value), b = toM(en.value); if (b > a) { t.s = a; t.len = b - a; } sel = null; render(); });
+  });
+})();
+
+// ================= 4 · Estimate first =================
+(() => {
+  const f = document.getElementById('f4'); let tasks = seedTasks().filter(t => t.len < 120), dragId = null;
+  let pool = [
+    { id: 'p1', line: 'l1', title: 'Write the report', len: 120 },
+    { id: 'p2', line: 'l3', title: 'Pack the bookshelf', len: 90 },
+    { id: 'p3', line: 'l2', title: 'Walk around the block', len: 20 },
+    { id: 'p4', line: 'l1', title: 'Answer emails', len: 45 },
+    { id: 'p5', line: 'l3', title: 'Clean the flat', len: 240 },
+  ];
+  const render = () => {
+    f.innerHTML = `<aside class="tray"><h3>To place</h3><p>How long each one takes. Drag it onto a time.</p>
+      ${pool.map(t => `<div class="card" draggable="true" data-pid="${t.id}" style="${vars(t.line)}"><span class="ldot"></span>${esc(t.title)}<span class="len">${lenText(t.len)}</span></div>
+        <div class="lenbar" style="${vars(t.line)}"><i style="width:${Math.min(100, t.len / 240 * 100)}%"></i></div>`).join('') || '<p>All placed.</p>'}
+      <p style="margin-top:auto;padding-top:10px">Bars are out of 4 hours.</p></aside>
+      <div class="main">${bar('Hours', `<span class="sub">${pool.length ? lenText(pool.reduce((a, t) => a + t.len, 0)) + ' still to place' : 'Everything has a time'}</span>`)}${gridHtml(tasks)}</div>`;
+  };
+  render();
+  f.addEventListener('dragstart', e => { const c = e.target.closest('[data-pid]'); if (!c) return; dragId = c.dataset.pid; e.dataTransfer.setData('text/plain', dragId); });
+  f.addEventListener('dragover', e => {
+    const col = e.target.closest('.col'); if (!col || !dragId) return; e.preventDefault();
+    const t = pool.find(p => p.id === dragId), s = snap(minAt(col, e.clientY) - 15);
+    f.querySelectorAll('.ev.ghost').forEach(g => g.remove());
+    col.insertAdjacentHTML('beforeend', `<div class="ev ghost" style="top:${topOf(s) + 1}px;height:${Math.max(18, t.len / 60 * HH - 2)}px"><span class="tt">${esc(t.title)}</span><span class="tm">${range(s, t.len)}</span></div>`);
+  });
+  f.addEventListener('drop', e => {
+    const col = e.target.closest('.col'); if (!col || !dragId) return; e.preventDefault();
+    const t = pool.find(p => p.id === dragId), s = Math.min(H1 * 60 - t.len, snap(minAt(col, e.clientY) - 15));
+    pool = pool.filter(p => p !== t); tasks.push({ ...t, day: +col.dataset.day, s }); dragId = null; render();
+  });
+  f.addEventListener('dragend', () => { dragId = null; f.querySelectorAll('.ev.ghost').forEach(g => g.remove()); });
+})();
+
+// ================= 5 · Day budget =================
+(() => {
+  const f = document.getElementById('f5'); let tasks = seedTasks(), sel = null;
+  const CAP = 6 * 60;   // planned hours that fit in a day
+  const render = () => {
+    const above = () => DAYS.map((d, i) => {
+      const ts = tasks.filter(t => t.day === i), total = ts.reduce((a, t) => a + t.len, 0);
+      const parts = Object.keys(LINES).map(l => [l, ts.filter(t => t.line === l).reduce((a, t) => a + t.len, 0)]).filter(([, m]) => m);
+      return `<div class="budget${total > CAP ? ' full' : ''}"><div class="mtr">${parts.map(([l, m]) => `<i style="width:${Math.min(100, m / CAP * 100)}%;background:${LINES[l].c}"></i>`).join('')}</div>
+        <div class="t"><span><b>${lenText(total)}</b> planned</span><span>${total > CAP ? `${lenText(total - CAP)} over` : `${lenText(CAP - total)} free`}</span></div></div>`;
+    }).join('');
+    const t = tasks.find(x => x.id === sel);
+    const day = t ? tasks.filter(x => x.day === t.day).reduce((a, x) => a + x.len, 0) : 0;
+    f.innerHTML = `<div class="main">${bar('Hours', `<span class="sub">A day fits about ${CAP / 60}h of planned tasks</span>`)}${gridHtml(tasks, { above: () => '<div class="budget" style="border-left:0"></div>' + above(), sel })}</div>
+      <aside class="side">${t ? `<h3>${esc(t.title)}</h3><div class="note mono">${range(t.s, t.len)}</div>
+        <div class="big">${lenText(t.len)}</div>
+        <div class="row"><button class="step" data-d="-15" aria-label="15 minutes shorter">−</button><button class="step" data-d="15" aria-label="15 minutes longer">+</button><span class="note">15 min steps</span></div>
+        <p class="empty" style="margin-top:14px">${DAYS[t.day].n} now has ${lenText(day)} planned${day > CAP ? `, ${lenText(day - CAP)} more than fits. Something could move to another day.` : '.'}</p>`
+        : '<h3>Select a task</h3><p class="empty">Each day shows its planned time by list. Click a task to make it shorter or longer and watch the day change.</p>'}</aside>`;
+  };
+  render();
+  f.addEventListener('click', e => {
+    const st = e.target.closest('[data-d]');
+    if (st) { const t = tasks.find(x => x.id === sel); t.len = Math.max(15, Math.min(H1 * 60 - t.s, t.len + +st.dataset.d)); render(); return; }
+    const ev = e.target.closest('.ev'); if (ev) { sel = ev.dataset.id; render(); return; }
+    if (e.target.closest('.col')) { sel = null; render(); }
+  });
+})();
+
+document.addEventListener('pointerdown', e => { document.querySelectorAll('.pop').forEach(p => { if (!p.contains(e.target) && !e.target.closest('.ev, .col')) p.remove(); }); });
+</script>
+</body>
+</html>

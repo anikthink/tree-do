@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree-do · Drag, quick lengths and day budget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --text:#1C2430; --text-2:#3F4856; --muted:#6B7480; --faint:#B4BBC5; --hair:#E8EAEE; --hair-2:#F0F2F5;
+    --fill:#F4F6F9; --fill-2:#ECEFF3; --lock:#C5CBD3;
+    --accent:#2F7CF6; --accent-ink:#1F62D0; --accent-tint:#EAF2FF; --danger:#D3343A; --danger-tint:#FDEEEE;
+    --e1:0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.08);
+    --ease:cubic-bezier(.22,.8,.3,1); --t:180ms; --hh:44px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--fill); color: var(--text); font-family: 'Figtree', sans-serif; font-size: 14px; -webkit-font-smoothing: antialiased; }
+  button, input, select { font: inherit; color: inherit; }
+  button { background: none; border: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .mono { font-family: 'Geist Mono', monospace; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .ldot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+
+  .page { max-width: 1240px; margin: 0 auto; padding: 40px 28px 80px; }
+  .intro h1 { font-size: 24px; font-weight: 700; }
+  .intro p { color: var(--text-2); font-size: 14.5px; line-height: 1.55; margin-top: 6px; max-width: 760px; }
+  .how { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 14px 0 18px; font-size: 13px; color: var(--muted); }
+  .how b { color: var(--text-2); font-weight: 600; }
+  .wrap { overflow-x: auto; border-radius: 16px; }
+  .frame { position: relative; min-width: 1100px; background: #fff; border: 1px solid var(--hair); border-radius: 16px; overflow: hidden; }
+
+  .bar { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 16px; border-bottom: 1px solid var(--hair); }
+  .bar .ttl { font-size: 14.5px; font-weight: 700; }
+  .bar .sub { font-size: 12px; color: var(--muted); }
+  .bar .cap { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .seg { display: flex; gap: 2px; padding: 2px; background: var(--fill); border-radius: 8px; }
+  .seg button { height: 24px; padding: 0 9px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--muted); font-family: 'Geist Mono', monospace; }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--text); font-weight: 500; box-shadow: 0 1px 2px rgba(15,23,42,.08), 0 0 0 1px rgba(15,23,42,.04); }
+
+  .scroll { max-height: 640px; overflow-y: auto; position: relative; }
+  .grid { position: relative; display: grid; grid-template-columns: 52px repeat(5, 1fr); }
+  .sticky { position: sticky; top: 0; z-index: 4; background: #fff; }
+  .dh { padding: 8px 10px 9px; border-left: 1px solid var(--hair-2); border-bottom: 1px solid var(--hair); }
+  .dh:first-child { border-left: 0; }
+  .dh .d { display: flex; align-items: baseline; gap: 7px; }
+  .dh .d span { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .dh .d b { font-family: 'Geist Mono', monospace; font-weight: 400; font-size: 17px; }
+  .dh.today .d span { color: var(--accent-ink); }
+  .dh.today .d b { display: inline-grid; place-items: center; min-width: 28px; height: 22px; padding: 0 5px; border-radius: 7px; background: var(--text); color: #fff; font-size: 14px; }
+  /* the day budget */
+  .mtr { position: relative; height: 6px; margin-top: 8px; border-radius: 3px; background: var(--fill-2); overflow: hidden; display: flex; gap: 1px; }
+  .mtr i { display: block; height: 100%; flex: none; transition: width var(--t) var(--ease); }
+  .mtr i.over { background: repeating-linear-gradient(135deg, var(--text) 0 3px, transparent 3px 6px); opacity: .55; }
+  .bt { display: flex; justify-content: space-between; gap: 6px; margin-top: 5px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .bt b { color: var(--text-2); font-weight: 600; font-family: 'Geist Mono', monospace; font-size: 10.5px; }
+  .dh.over .bt .left { color: var(--text); font-weight: 600; }
+  .dh.flash .mtr { box-shadow: 0 0 0 2px var(--accent-tint); }
+
+  .gut { position: relative; }
+  .gut span { position: absolute; right: 8px; transform: translateY(-50%); font-size: 10.5px; color: var(--muted); font-family: 'Geist Mono', monospace; }
+  .col { position: relative; border-left: 1px solid var(--hair-2); height: calc(var(--hh) * var(--rows)); cursor: cell;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 calc(var(--hh) - 1px), var(--hair-2) calc(var(--hh) - 1px) var(--hh)); }
+  .col.past { background-color: #FBFBFC; }
+  .ev { position: absolute; border-radius: 8px; background: var(--tint); color: var(--tx); padding: 4px 8px; overflow: hidden; cursor: grab;
+    font-size: 12px; font-weight: 600; line-height: 1.25; user-select: none; transition: box-shadow var(--t) var(--ease); }
+  .ev .tm { display: block; font-family: 'Geist Mono', monospace; font-weight: 400; font-size: 10.5px; color: var(--muted); }
+  .ev.short { display: flex; align-items: center; gap: 6px; padding-top: 0; padding-bottom: 0; }
+  .ev.short .tm { display: inline; }
+  .ev .tt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev:hover { box-shadow: inset 0 0 0 1px var(--c), var(--e1); }
+  .ev.sel { box-shadow: inset 0 0 0 2px var(--c), var(--e1); z-index: 3; }
+  .ev.dragging { z-index: 5; box-shadow: inset 0 0 0 1.5px var(--c), 0 10px 28px rgba(15,23,42,.16); cursor: grabbing; }
+  .ev.ghost { background: var(--tint, var(--accent-tint)); color: var(--tx, var(--accent-ink)); box-shadow: inset 0 0 0 1.5px var(--c, var(--accent)), var(--e1); pointer-events: none; z-index: 5; }
+  .ev .len { position: absolute; right: 6px; bottom: 4px; font-family: 'Geist Mono', monospace; font-size: 10px; font-weight: 500; background: #fff; border-radius: 4px; padding: 0 4px; color: var(--text-2); }
+  .rs { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; cursor: ns-resize; }
+  .rs::after { content: ''; position: absolute; left: 50%; bottom: 2px; width: 18px; height: 3px; margin-left: -9px; border-radius: 2px; background: var(--c); opacity: 0; transition: opacity var(--t); }
+  .ev:hover .rs::after { opacity: .6; }
+  .now { position: absolute; left: -1px; right: 0; height: 2px; background: var(--text); z-index: 2; pointer-events: none; }
+  .now::before { content: ''; position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--text); }
+  body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select: none; }
+
+  /* the editor: opens after a drag-create, or on clicking a task */
+  .pop { position: absolute; z-index: 20; width: 316px; padding: 12px; background: #fff; border: 1px solid var(--hair); border-radius: 12px; box-shadow: var(--e1); animation: rise var(--t) var(--ease); }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .name { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--hair); border-radius: 8px; font-size: 14px; font-weight: 600; outline: none; }
+  .name:focus, .tinput:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,124,246,.16); }
+  .name::placeholder { color: var(--faint); font-weight: 500; }
+  .lbl { display: block; margin: 10px 0 4px; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .tracks { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tracks button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 7px; background: var(--fill); font-size: 12px; font-weight: 500; color: var(--text-2); }
+  .tracks button:hover { background: var(--fill-2); }
+  .tracks button[aria-checked="true"] { background: var(--tint); color: var(--tx); font-weight: 600; box-shadow: inset 0 0 0 1px var(--c); }
+  .times { display: flex; align-items: center; gap: 5px; }
+  .times .tinput { flex: 1; min-width: 0; text-align: center; }
+  .times select { flex: none; width: 92px; }
+  .tinput { height: 30px; padding: 0 8px; border: 1px solid var(--hair); border-radius: 7px; font-family: 'Geist Mono', monospace; font-size: 12.5px; outline: none; }
+  .times .to { font-size: 12px; color: var(--muted); }
+  .times select { height: 30px; border: 1px solid var(--hair); border-radius: 7px; padding: 0 6px; background: #fff; font-size: 12.5px; }
+  .lens { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .lens button { height: 26px; min-width: 38px; padding: 0 8px; border-radius: 7px; background: var(--fill); font-family: 'Geist Mono', monospace; font-size: 11.5px; color: var(--text-2); }
+  .lens button:hover { background: var(--fill-2); }
+  .lens button[aria-pressed="true"] { background: var(--text); color: #fff; }
+  .impact { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--fill); font-size: 12px; color: var(--text-2); line-height: 1.4; }
+  .impact .mtr { margin-top: 6px; background: #fff; }
+  .impact.over { background: var(--fill-2); }
+  .impact b { font-weight: 600; color: var(--text); }
+  .foot { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+  .foot .sp { flex: 1; }
+  .btn { height: 30px; padding: 0 14px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 600; }
+  .btn:hover { background: var(--accent-ink); }
+  .btn[disabled] { opacity: .4; cursor: default; background: var(--accent); }
+  .ghostbtn { height: 30px; padding: 0 10px; border-radius: 8px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+  .ghostbtn:hover { background: var(--fill); color: var(--text); }
+  .del { height: 30px; padding: 0 8px; margin-left: -6px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--danger); }
+  .del:hover { background: var(--danger-tint); }
+  .hint { font-size: 11px; color: var(--faint); }
+
+  .toast { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 30; display: none; align-items: center; gap: 10px; padding: 8px 8px 8px 14px;
+    background: #fff; border: 1px solid var(--hair); border-radius: 10px; box-shadow: var(--e1); font-size: 13px; font-weight: 500; }
+  .toast.show { display: flex; animation: rise var(--t) var(--ease); }
+  .toast button { height: 26px; padding: 0 10px; border-radius: 7px; color: var(--accent-ink); font-weight: 600; font-size: 12.5px; }
+  .toast button:hover { background: var(--accent-tint); }
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="intro">
+    <h1>Drag, then set it up</h1>
+    <p>Drag on empty time to make a task as long as you need. As soon as you let go, the task's editor opens next to it so you can name it, pick its track and adjust the time, with quick lengths one tap away. The bar at the top of each day shows how much of it is planned, so you can see when a day gets too full before it happens.</p>
+  </header>
+  <div class="how">
+    <span><b>Drag on empty time</b> to create</span>
+    <span><b>Drag a task</b> to move it</span>
+    <span><b>Drag its bottom edge</b> to resize</span>
+    <span><b>Click a task</b> to edit or delete</span>
+    <span><b>Day limit</b> top right</span>
+  </div>
+  <div class="wrap"><div class="frame" id="app"></div></div>
+</main>
+
+<script>
+const TRACKS = {
+  up: { name: 'Upkeep', c: '#5B6B7F', tx: '#4A5868', tint: '#EFF0F2' },
+  l1: { name: 'Work', c: '#2F7CF6', tx: '#1F62D0', tint: '#EAF2FF' },
+  l2: { name: 'Health', c: '#14A38B', tx: '#0B7563', tint: '#E8F6F3' },
+  l3: { name: 'Home move', c: '#F2645A', tx: '#C13D33', tint: '#FDF0EF' },
+};
+const DAYS = [{ n: 'Today', d: 19 }, { n: 'Tomorrow', d: 20 }, { n: 'Wed', d: 21 }, { n: 'Thu', d: 22 }, { n: 'Fri', d: 23 }];
+const H0 = 7, H1 = 22, HH = 44, NOW = 11 * 60 + 20, SNAP = 15, LENS = [15, 30, 45, 60, 120, 240];
+let cap = 6 * 60;
+let tasks = [
+  { id: 'a', line: 'up', title: 'Take meds', day: 0, s: 8 * 60, len: 15 },
+  { id: 'b', line: 'l1', title: 'Team standup', day: 0, s: 10 * 60 + 30, len: 30 },
+  { id: 'c', line: 'l1', title: 'Deep work: report', day: 0, s: 13 * 60, len: 180 },
+  { id: 'd', line: 'l2', title: 'Stretch', day: 0, s: 18 * 60, len: 15 },
+  { id: 'e', line: 'up', title: 'Take meds', day: 1, s: 8 * 60, len: 15 },
+  { id: 'f', line: 'l3', title: 'Pack the kitchen', day: 1, s: 9 * 60 + 30, len: 120 },
+  { id: 'g', line: 'l2', title: 'Dentist', day: 1, s: 15 * 60, len: 45 },
+  { id: 'h', line: 'up', title: 'Take meds', day: 2, s: 8 * 60, len: 15 },
+  { id: 'i', line: 'l1', title: 'Team standup', day: 2, s: 10 * 60 + 30, len: 30 },
+  { id: 'j', line: 'l3', title: 'Movers arrive', day: 2, s: 12 * 60, len: 240 },
+  { id: 'k', line: 'l1', title: 'Write the proposal', day: 2, s: 9 * 60, len: 90 },
+  { id: 'l', line: 'up', title: 'Take meds', day: 3, s: 8 * 60, len: 15 },
+  { id: 'm', line: 'l2', title: 'Run', day: 3, s: 7 * 60 + 15, len: 45 },
+  { id: 'n', line: 'up', title: 'Take meds', day: 4, s: 8 * 60, len: 15 },
+  { id: 'o', line: 'l1', title: 'Team standup', day: 4, s: 10 * 60 + 30, len: 30 },
+];
+const pad = n => String(n).padStart(2, '0');
+const hm = m => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+const toM = v => +v.slice(0, 2) * 60 + +v.slice(3, 5);
+const range = (s, len) => `${hm(s)}–${hm(s + len)}`;
+const lenText = m => m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m / 60}h`;
+const lenShort = m => m < 60 ? `${m}m` : m % 60 ? `${Math.floor(m / 60)}h${m % 60}` : `${m / 60}h`;
+const vars = l => `--c:${TRACKS[l].c};--tx:${TRACKS[l].tx};--tint:${TRACKS[l].tint}`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const topOf = m => (m - H0 * 60) / 60 * HH;
+const evH = len => Math.max(18, len / 60 * HH - 2);
+const snapM = (m, f = Math.round) => Math.max(H0 * 60, Math.min(H1 * 60, f(m / SNAP) * SNAP));
+const app = document.getElementById('app');
+let uid = 0, edit = null, drag = null, undo = null;
+
+/** Planned minutes per track for a day; `draft` stands in for the task being edited (or created). */
+function dayLoad(day, draft) {
+  const ts = tasks.filter(t => t.day === day && (!draft || t.id !== draft.id));
+  if (draft && draft.day === day) ts.push(draft);
+  const by = Object.keys(TRACKS).map(l => [l, ts.filter(t => t.line === l).reduce((a, t) => a + t.len, 0)]).filter(([, m]) => m);
+  return { total: ts.reduce((a, t) => a + t.len, 0), by };
+}
+function meter(day, draft) {
+  const { total, by } = dayLoad(day, draft), scale = Math.max(cap, total);
+  return `<div class="mtr">${by.map(([l, m]) => `<i style="width:${m / scale * 100}%;background:${TRACKS[l].c}"></i>`).join('')}${total > cap ? '' : ''}</div>`;
+}
+function budgetHtml(i, draft) {
+  const { total } = dayLoad(i, draft), over = total - cap;
+  return `${meter(i, draft)}<div class="bt"><span><b>${lenShort(total)}</b> of ${lenShort(cap)}</span><span class="left">${over > 0 ? `${lenText(over)} over` : `${lenText(cap - total)} free`}</span></div>`;
+}
+
+// ---------- render
+function layout(day) {
+  // overlapping tasks share the column in lanes
+  const evs = tasks.filter(t => t.day === day).sort((a, b) => a.s - b.s || b.len - a.len), pos = new Map();
+  let cluster = [], ends = [], cEnd = -1;
+  const flush = () => { cluster.forEach(t => { pos.get(t).of = Math.max(1, ends.length); }); cluster = []; ends = []; };
+  evs.forEach(t => {
+    if (t.s >= cEnd) flush();
+    let k = ends.findIndex(x => x <= t.s); if (k < 0) k = ends.length;
+    ends[k] = t.s + t.len; pos.set(t, { lane: k, of: 1 }); cluster.push(t); cEnd = Math.max(cEnd, t.s + t.len);
+  });
+  flush();
+  return evs.map(t => ({ t, ...pos.get(t) }));
+}
+function evHtml(t, lane = 0, of = 1) {
+  const short = t.len < 45, sel = edit && edit.draft.id === t.id;
+  return `<div class="ev${short ? ' short' : ''}${sel ? ' sel' : ''}" data-id="${t.id}" tabindex="0" role="button" aria-label="${esc(t.title)}, ${range(t.s, t.len)}. Edit."
+    style="${vars(t.line)};top:${topOf(t.s) + 1}px;height:${evH(t.len)}px;left:calc(${lane} * 100% / ${of} + 3px);width:calc(100% / ${of} - 6px)">
+    <span class="tt">${esc(t.title)}</span><span class="tm">${range(t.s, t.len)}</span><span class="rs" data-rs></span></div>`;
+}
+function render() {
+  const scrollTop = app.querySelector('.scroll')?.scrollTop;
+  let h = `<div class="bar"><span class="ttl">Hours</span><span class="sub mono">19–23 Oct</span>
+    <div class="cap">Plan up to<div class="seg">${[4, 5, 6, 7, 8].map(n => `<button data-cap="${n * 60}" aria-pressed="${cap === n * 60}">${n}h</button>`).join('')}</div>a day</div></div>
+    <div class="scroll"><div class="grid" style="--rows:${H1 - H0}">`;
+  h += '<div class="dh sticky"></div>' + DAYS.map((d, i) => {
+    const over = dayLoad(i).total > cap;
+    return `<div class="dh sticky${i === 0 ? ' today' : ''}${over ? ' over' : ''}" data-dh="${i}"><div class="d"><b>${d.d}</b><span>${d.n}</span></div><div class="bud">${budgetHtml(i)}</div></div>`;
+  }).join('');
+  h += '<div class="gut">' + Array.from({ length: H1 - H0 - 1 }, (_, i) => `<span style="top:${(i + 1) * HH}px">${pad(H0 + i + 1)}:00</span>`).join('') + '</div>';
+  DAYS.forEach((d, i) => {
+    h += `<div class="col" data-day="${i}">${layout(i).map(({ t, lane, of }) => evHtml(t, lane, of)).join('')}`;
+    if (i === 0) h += `<div class="now" style="top:${topOf(NOW)}px"></div>`;
+    h += '</div>';
+  });
+  h += '</div></div><div class="toast" id="toast"><span id="toastMsg"></span><button id="undo">Undo</button></div>';
+  app.innerHTML = h;
+  const sc = app.querySelector('.scroll'); sc.scrollTop = scrollTop ?? topOf(8 * 60);
+  if (edit) placePop();
+}
+/** Live budget only (during drags and while editing), so the grid isn't rebuilt under the pointer. */
+function refreshBudget(draft) {
+  DAYS.forEach((_, i) => {
+    const el = app.querySelector(`[data-dh="${i}"]`); if (!el) return;
+    el.querySelector('.bud').innerHTML = budgetHtml(i, draft);
+    el.classList.toggle('over', dayLoad(i, draft).total > cap);
+    el.classList.toggle('flash', !!draft && draft.day === i);
+  });
+}
+let toastTimer;
+function toast(msg) {
+  const t = app.querySelector('#toast'); app.querySelector('#toastMsg').textContent = msg;
+  t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 5000);
+}
+const snapshot = () => { undo = JSON.stringify(tasks); };
+
+// ---------- the editor
+function openEditor(draft, isNew) {
+  edit = { draft: { ...draft }, isNew };
+  app.querySelector('.pop')?.remove();
+  const p = document.createElement('div'); p.className = 'pop'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', isNew ? 'New task' : 'Edit task');
+  app.appendChild(p);
+  drawEditor(true);
+  placePop();
+  const name = p.querySelector('.name'); name.focus(); if (!isNew) name.select();
+}
+function drawEditor(first) {
+  const p = app.querySelector('.pop'), d = edit.draft; if (!p) return;
+  if (first) {
+    p.innerHTML = `<input class="name" placeholder="What is it?" autocomplete="off" spellcheck="false" aria-label="Name">
+      <span class="lbl">Track</span>
+      <div class="tracks" role="radiogroup" aria-label="Track">${Object.entries(TRACKS).map(([id, l]) => `<button role="radio" data-track="${id}" style="${vars(id)}"><span class="ldot"></span>${l.name}</button>`).join('')}</div>
+      <span class="lbl">Time</span>
+      <div class="times"><select data-day aria-label="Day">${DAYS.map((x, i) => `<option value="${i}">${x.n}</option>`).join('')}</select>
+        <input class="tinput" type="text" inputmode="numeric" maxlength="5" data-s aria-label="Starts, 24-hour"><span class="to">to</span><input class="tinput" type="text" inputmode="numeric" maxlength="5" data-e aria-label="Ends, 24-hour"></div>
+      <div class="lens" aria-label="Quick lengths">${LENS.map(m => `<button data-len="${m}">${lenShort(m)}</button>`).join('')}</div>
+      <div class="impact"></div>
+      <div class="foot">${edit.isNew ? '<button class="ghostbtn" data-cancel>Cancel</button>' : '<button class="del" data-del>Delete</button>'}<span class="sp"></span><span class="hint">Enter</span><button class="btn" data-save>${edit.isNew ? 'Add' : 'Save'}</button></div>`;
+    p.querySelector('.name').value = edit.isNew ? '' : d.title;
+  }
+  // only what changed: fields being typed in keep their focus and caret
+  const { total } = dayLoad(d.day, d), over = total - cap;
+  p.querySelectorAll('[data-track]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.track === d.line)));
+  p.querySelectorAll('[data-len]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.len === d.len)));
+  p.querySelector('[data-day]').value = String(d.day);
+  const si = p.querySelector('[data-s]'), ei = p.querySelector('[data-e]');
+  if (document.activeElement !== si) si.value = hm(d.s);
+  if (document.activeElement !== ei) ei.value = hm(d.s + d.len);
+  const im = p.querySelector('.impact');
+  im.classList.toggle('over', over > 0);
+  im.innerHTML = `${DAYS[d.day].n}: <b>${lenText(total)}</b> of ${lenText(cap)} planned${over > 0 ? `, <b>${lenText(over)} over</b>. Something could move to another day.` : `, ${lenText(cap - total)} still free.`}${meter(d.day, d)}`;
+  p.querySelector('[data-save]').disabled = !p.querySelector('.name').value.trim();
+  refreshBudget(d);
+  // keep the shape on the grid in step with the editor
+  const g = app.querySelector('.ev.ghost') || app.querySelector(`.ev[data-id="${d.id}"]`);
+  if (g) {
+    const col = app.querySelector(`.col[data-day="${d.day}"]`); if (g.parentElement !== col) col.appendChild(g);
+    Object.assign(g.style, { top: topOf(d.s) + 1 + 'px', height: evH(d.len) + 'px', left: '3px', width: 'calc(100% - 6px)' });
+    const tm = g.querySelector('.tm'); if (tm) tm.textContent = range(d.s, d.len);
+    g.classList.toggle('short', d.len < 45);
+  }
+}
+function placePop() {
+  const p = app.querySelector('.pop'); if (!p || !edit) return;
+  const a = app.querySelector('.ev.ghost') || app.querySelector(`.ev[data-id="${edit.draft.id}"]`); if (!a) return;
+  const fr = app.getBoundingClientRect(), r = a.getBoundingClientRect();
+  let left = r.right - fr.left + 10; if (left + 326 > fr.width) left = r.left - fr.left - 326;
+  p.style.left = Math.max(8, left) + 'px';
+  p.style.top = Math.min(Math.max(60, r.top - fr.top - 8), fr.height - p.offsetHeight - 8) + 'px';
+}
+function closeEditor() {
+  edit = null; app.querySelector('.pop')?.remove(); app.querySelectorAll('.ev.ghost').forEach(g => g.remove()); render();
+}
+function saveEditor() {
+  const p = app.querySelector('.pop'), title = p.querySelector('.name').value.trim(); if (!title) return;
+  snapshot();
+  const d = { ...edit.draft, title }, i = tasks.findIndex(t => t.id === d.id);
+  if (i >= 0) tasks[i] = d; else tasks.push(d);
+  const msg = `“${title}” ${edit.isNew ? 'added' : 'saved'}: ${DAYS[d.day].n}, ${range(d.s, d.len)}.`;
+  closeEditor(); toast(msg);
+}
+app.addEventListener('input', e => {
+  if (!edit) return;
+  const d = edit.draft;
+  if (e.target.matches('.name')) {
+    app.querySelector('[data-save]').disabled = !e.target.value.trim();
+    const g = app.querySelector('.ev.ghost .tt'); if (g) g.textContent = e.target.value.trim() || 'New task';
+    return;
+  }
+  // 24-hour times, read once they look whole ("9:30", "14:05"); out-of-range ones wait for more typing
+  const read = v => { const m = v.trim().match(/^(\d{1,2})[:.](\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null; };
+  if (e.target.matches('[data-s]')) { const v = read(e.target.value); if (v != null && v >= H0 * 60) { d.s = Math.min(v, H1 * 60 - d.len); drawEditor(); } }
+  if (e.target.matches('[data-e]')) { const v = read(e.target.value); if (v != null && v - d.s >= SNAP) { d.len = Math.min(v, H1 * 60) - d.s; drawEditor(); } }
+});
+app.addEventListener('focusout', e => { if (edit && e.target.matches('[data-s], [data-e]')) setTimeout(() => edit && drawEditor(), 0); });
+app.addEventListener('change', e => { if (edit && e.target.matches('[data-day]')) { edit.draft.day = +e.target.value; drawEditor(); placePop(); app.querySelector('.pop .name')?.focus(); } });
+document.addEventListener('keydown', e => {
+  if (!edit) return;
+  if (e.key === 'Enter' && !e.target.matches('button, select')) { e.preventDefault(); saveEditor(); }
+  if (e.key === 'Escape') { e.preventDefault(); closeEditor(); }
+});
+
+// ---------- clicks: editor buttons, day limit, opening a task
+app.addEventListener('click', e => {
+  if (justDragged) { justDragged = false; return; }
+  const p = e.target.closest('.pop');
+  if (p) {
+    // after a chip, focus goes back to the name, so typing and Enter carry on
+    const tr = e.target.closest('[data-track]'); if (tr) { edit.draft.line = tr.dataset.track; drawEditor(); const g = app.querySelector('.ev.ghost') || app.querySelector(`.ev[data-id="${edit.draft.id}"]`); if (g) vars(edit.draft.line).split(';').forEach(kv => { const [k, v] = kv.split(':'); g.style.setProperty(k, v); }); app.querySelector('.pop .name')?.focus(); return; }
+    const ln = e.target.closest('[data-len]'); if (ln) { edit.draft.len = Math.min(+ln.dataset.len, H1 * 60 - edit.draft.s); drawEditor(); app.querySelector('.pop .name')?.focus(); return; }
+    if (e.target.closest('[data-save]')) saveEditor();
+    if (e.target.closest('[data-cancel]')) closeEditor();
+    if (e.target.closest('[data-del]')) { snapshot(); const t = edit.draft; tasks = tasks.filter(x => x.id !== t.id); closeEditor(); toast(`“${t.title}” deleted.`); }
+    return;
+  }
+  const c = e.target.closest('[data-cap]'); if (c) { cap = +c.dataset.cap; render(); return; }
+  if (e.target.closest('#undo')) { if (undo) { tasks = JSON.parse(undo); undo = null; render(); } return; }
+  const ev = e.target.closest('.ev[data-id]');
+  if (ev) { const t = tasks.find(x => x.id === ev.dataset.id); render(); openEditor(t, false); app.querySelector(`.ev[data-id="${t.id}"]`)?.classList.add('sel'); return; }
+  if (edit && !e.target.closest('.col')) closeEditor();
+});
+
+// ---------- drag: create on empty time, move a task, stretch its bottom edge
+let justDragged = false;
+const minAt = (col, y) => H0 * 60 + (y - col.getBoundingClientRect().top) / HH * 60;
+const colAt = x => [...app.querySelectorAll('.col')].find(c => { const r = c.getBoundingClientRect(); return x >= r.left && x < r.right; });
+app.addEventListener('pointerdown', e => {
+  if (e.button || e.target.closest('.pop')) return;
+  const col = e.target.closest('.col'); if (!col) return;
+  const ev = e.target.closest('.ev[data-id]'), m = minAt(col, e.clientY);
+  if (edit) {   // starting something new on the grid puts the open editor away (without rebuilding what's under the pointer)
+    edit = null; app.querySelector('.pop')?.remove(); app.querySelectorAll('.ev.ghost').forEach(g => g.remove());
+    app.querySelectorAll('.ev.sel').forEach(x => x.classList.remove('sel')); refreshBudget();
+  }
+  if (ev) {
+    const t = tasks.find(x => x.id === ev.dataset.id);
+    drag = { kind: e.target.closest('[data-rs]') ? 'size' : 'move', t: { ...t }, id: t.id, off: m - t.s, x0: e.clientX, y0: e.clientY, moved: false };
+  } else {
+    drag = { kind: 'new', day: +col.dataset.day, a: snapM(m, Math.floor), x0: e.clientX, y0: e.clientY, moved: false };
+  }
+  try { app.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
+});
+app.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 4) return;
+  if (!drag.moved) { drag.moved = true; document.body.classList.add('is-dragging'); }
+  if (drag.kind === 'new') {
+    const col = app.querySelector(`.col[data-day="${drag.day}"]`);
+    let g = col.querySelector('.ev.ghost');
+    if (!g) { g = document.createElement('div'); g.className = 'ev ghost'; g.style.cssText = 'left:3px;width:calc(100% - 6px)'; col.appendChild(g); }
+    const b = snapM(minAt(col, e.clientY)), s = Math.min(drag.a, b), en = Math.max(drag.a + SNAP, b);
+    drag.draft = { id: 'n' + uid, line: 'l1', title: '', day: drag.day, s, len: en - s };
+    Object.assign(g.style, { top: topOf(s) + 1 + 'px', height: evH(en - s) + 'px' });
+    g.classList.toggle('short', en - s < 45);
+    g.innerHTML = `<span class="tt">New task</span><span class="tm">${range(s, en - s)}</span><span class="len">${lenShort(en - s)}</span>`;
+    refreshBudget(drag.draft);
+    return;
+  }
+  const el = app.querySelector(`.ev[data-id="${drag.id}"]`); if (!el) return;
+  el.classList.add('dragging');
+  if (drag.kind === 'size') {
+    drag.t.len = Math.max(SNAP, Math.min(H1 * 60, snapM(minAt(el.parentElement, e.clientY))) - drag.t.s);
+  } else {
+    const col = colAt(e.clientX) || el.parentElement;
+    if (el.parentElement !== col) col.appendChild(el);
+    drag.t.day = +col.dataset.day;
+    drag.t.s = Math.min(H1 * 60 - drag.t.len, snapM(minAt(col, e.clientY) - drag.off));
+  }
+  Object.assign(el.style, { top: topOf(drag.t.s) + 1 + 'px', height: evH(drag.t.len) + 'px', left: '3px', width: 'calc(100% - 6px)' });
+  el.classList.toggle('short', drag.t.len < 45);
+  el.querySelector('.tm').textContent = range(drag.t.s, drag.t.len);
+  let lenTag = el.querySelector('.len'); if (!lenTag) { lenTag = document.createElement('span'); lenTag.className = 'len'; el.appendChild(lenTag); }
+  lenTag.textContent = lenShort(drag.t.len);
+  refreshBudget(drag.t);
+});
+app.addEventListener('pointerup', e => {
+  if (!drag) return;
+  const d = drag; drag = null; document.body.classList.remove('is-dragging');
+  if (d.kind === 'new') {
+    // a plain click makes a 30-minute task; a drag makes exactly what was dragged. Either way, the editor opens.
+    const draft = d.moved ? d.draft : { id: 'n' + uid, line: 'l1', title: '', day: d.day, s: Math.min(d.a, H1 * 60 - 30), len: 30 };
+    uid++; justDragged = true; setTimeout(() => { justDragged = false; }, 0);
+    if (!d.moved) {
+      const col = app.querySelector(`.col[data-day="${d.day}"]`), g = document.createElement('div');
+      g.className = 'ev ghost short'; g.style.cssText = `left:3px;width:calc(100% - 6px);top:${topOf(draft.s) + 1}px;height:${evH(30)}px`;
+      g.innerHTML = `<span class="tt">New task</span><span class="tm">${range(draft.s, 30)}</span>`; col.appendChild(g);
+    }
+    app.querySelector('.ev.ghost .len')?.remove();
+    openEditor(draft, true);
+    return;
+  }
+  if (!d.moved) return;   // a click: the click handler opens the editor
+  justDragged = true; setTimeout(() => { justDragged = false; }, 0);
+  snapshot();
+  const i = tasks.findIndex(t => t.id === d.id); tasks[i] = d.t;
+  render();
+  toast(`“${d.t.title}” ${d.kind === 'size' ? 'now ' + lenText(d.t.len) : 'moved to ' + DAYS[d.t.day].n}, ${range(d.t.s, d.t.len)}.`);
+});
+app.addEventListener('pointercancel', () => { drag = null; document.body.classList.remove('is-dragging'); render(); });
+render();
+</script>
+</body>
+</html>
