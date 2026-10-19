@@ -1,6 +1,6 @@
 // The day rules: what is due today, what counts as done, and what carries over.
 import { addDays, diffDays, parseYmd } from './time';
-import type { Plan, Task } from './types';
+import type { Plan, Repeat, Task } from './types';
 
 export function taskById(tasks: readonly Task[], id: string): Task | undefined {
   return tasks.find(t => t.id === id);
@@ -106,4 +106,37 @@ export function placeNear(tasks: readonly Task[], t: Task, target: Task, where: 
   const at = where === 'after' ? target.order + 1 : target.order;
   tasks.forEach(x => { if (x !== t && x.order >= at) x.order++; });
   t.order = at;
+}
+
+/** What the week's editor can change. */
+export interface TaskEdit {
+  title: string;
+  line: string;
+  time: string | null;
+  /** One-offs: the day (today or earlier means today). Ignored for repeats. */
+  date: string | null;
+  repeat: Repeat | null;
+}
+
+/**
+ * Apply an edit. A repeat has no date; a one-off planned for today or earlier simply runs today.
+ * Moving to another list puts the task at the end of that list's trunk, and its branches come along.
+ */
+export function editTask(tasks: readonly Task[], t: Task, e: TaskEdit, today: string): void {
+  const title = e.title.trim();
+  if (title) t.title = title;
+  t.time = e.time;
+  t.someday = false;
+  if (e.repeat) {
+    if (JSON.stringify(e.repeat) !== JSON.stringify(t.repeat)) t.skip = null;
+    t.repeat = e.repeat; t.date = null;
+  } else {
+    if (t.repeat) { t.repeat = null; t.lastDone = null; t.skip = null; if (t.doneOn && t.doneOn !== today) t.doneOn = null; }
+    t.date = e.date && e.date > today ? e.date : null;
+  }
+  if (e.line !== t.line) {
+    tasks.forEach(x => { if (x !== t && isWithin(tasks, x, t.id)) x.line = e.line; });
+    t.line = e.line; t.from = null; t.fork = 0; t.order = nextOrder(tasks);
+    if (t.line !== 'up') t.anchor = false;
+  }
 }

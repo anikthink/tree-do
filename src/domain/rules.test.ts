@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canPlace, hasPending, inheritSchedule, isDone, isDueToday, markDone, onTodaysMap, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen } from './rules';
+import { canPlace, editTask, hasPending, inheritSchedule, isDone, isDueToday, markDone, onTodaysMap, placeNear, pruneFinished, putOffToTomorrow, removeTask, reopen } from './rules';
 import { task } from './test-helpers';
 
 const MON = '2026-10-19', TUE = '2026-10-20', SAT = '2026-10-24', SUN = '2026-10-25', PREV_SUN = '2026-10-18';
@@ -144,5 +144,30 @@ describe('placing a task next to another', () => {
     expect(own.repeat).toEqual({ type: 'daily' });
     const later = task(); inheritSchedule(later, task({ date: TUE }), MON);
     expect(later.date).toBe(TUE);
+  });
+});
+
+describe('editing a task (the week\'s editor)', () => {
+  const base = { title: 'Call mum', line: 'up', time: null, date: null, repeat: null };
+  it('renames, retimes and reschedules a one-off', () => {
+    const t = task({ title: 'Call' });
+    editTask([t], t, { ...base, time: '15:00', date: SAT }, MON);
+    expect([t.title, t.time, t.date]).toEqual(['Call mum', '15:00', SAT]);
+    editTask([t], t, { ...base, title: '  ', date: MON }, MON);
+    expect([t.title, t.time, t.date]).toEqual(['Call mum', null, null]);   // blank keeps the name; today needs no date
+  });
+  it('turning a one-off into a repeat drops its date, and back again', () => {
+    const t = task({ date: SAT });
+    editTask([t], t, { ...base, repeat: { type: 'daily' }, date: SAT }, MON);
+    expect([t.repeat, t.date]).toEqual([{ type: 'daily' }, null]);
+    t.lastDone = PREV_SUN;
+    editTask([t], t, { ...base, date: TUE }, MON);
+    expect([t.repeat, t.lastDone, t.date]).toEqual([null, null, TUE]);
+  });
+  it('moving to another list goes to the end of its trunk, branches and all', () => {
+    const a = task({ line: 'l1' }), b = task({ line: 'l1', from: a.id }), c = task({ line: 'l1', from: b.id }), other = task({ line: 'l2' });
+    editTask([a, b, c, other], b, { ...base, line: 'l2' }, MON);
+    expect([b.line, b.from, c.line, c.from]).toEqual(['l2', null, 'l2', b.id]);
+    expect(b.order).toBeGreaterThan(other.order);
   });
 });

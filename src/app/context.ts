@@ -1,5 +1,7 @@
 // The cross-module calls the panel, map and actions make on each other, wired by the engine.
-import type { Where } from '../domain/rules';
+import type { TaskEdit, Where } from '../domain/rules';
+import type { Task } from '../domain/types';
+import type { Slot } from '../domain/week';
 import type { Snap, Tab } from './store';
 
 export type MoveKind = 'later' | 'tomorrow' | 'someday' | 'undone' | 'delete';
@@ -16,6 +18,10 @@ export interface App {
   /** Put a task right before or after another (its list and branch). */
   place(id: string, targetId: string, where: Where): void;
   resetDemo(): void;
+  /** Change a task from the week's editor. */
+  edit(id: string, e: TaskEdit): void;
+  /** Add a task typed into a slot on the week (null if there was nothing to add). */
+  addAt(text: string, slot: Slot, line: string | null): Task | null;
   // sheet + views
   setSnap(name: Snap, opts?: SnapOpts): void;
   setTab(tab: Tab): void;

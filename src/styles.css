@@ -429,6 +429,8 @@ body.pinned .week { left: calc(16px + 344px + 16px); bottom: 16px; }
 
 .wk-head { flex: none; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--hair); }
 .wk-title { font-size: 14px; font-weight: 700; }
+.wk-hint { margin-right: auto; font-size: 12px; color: var(--muted); }
+@media (hover: none) { .wk-hint { display: none; } }
 .wk-seg { display: flex; gap: 2px; padding: 2px; background: var(--fill); border-radius: 8px; }
 .wk-seg button { height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: none; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--muted);
   transition: background var(--t) var(--ease), color var(--t) var(--ease); }
@@ -441,10 +443,17 @@ body.pinned .week { left: calc(16px + 344px + 16px); bottom: 16px; }
   transition: background var(--t) var(--ease), border-color var(--t) var(--ease), transform var(--t) var(--ease); }
 .wm svg { width: 72%; height: 72%; overflow: visible; }
 .wm path { fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.done > .wm { background: var(--c); }
-.later > .wm { border-style: dashed; border-color: var(--lock); }
-.ticking > .wm { background: var(--c); border-color: var(--c); border-style: solid; animation: tick 320ms var(--ease); }
-[data-tick]:hover > .wm, [data-tick]:focus-visible > .wm { box-shadow: 0 0 0 3px var(--tint); }
+.done .wm { background: var(--c); }
+.later .wm { border-style: dashed; border-color: var(--lock); }
+.ticking .wm { background: var(--c); border-color: var(--c); border-style: solid; animation: tick 320ms var(--ease); }
+[data-tick]:hover .wm, [data-tick]:focus-visible .wm { box-shadow: 0 0 0 3px var(--tint); }
+/* a task on the week: the circle (.wmb) ticks it, the rest (.wbody) opens the editor */
+.wmb { flex: none; display: grid; place-items: center; padding: 0; border: 0; background: none; color: inherit; }
+button.wmb { cursor: pointer; }
+button.wmb:focus-visible { outline-offset: -2px; }
+.wbody { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; }
+button.wbody { cursor: pointer; }
+button.wbody:focus-visible { outline-offset: 1px; }
 .done .tt { color: var(--muted); }
 .later .tt { color: var(--text-2); }
 
@@ -477,23 +486,24 @@ body.pinned .week { left: calc(16px + 344px + 16px); bottom: 16px; }
 .hv-chip.later { background: #fff; box-shadow: inset 0 0 0 1px var(--hair); color: var(--text-2); }
 .hv-list { display: none; padding: 1px 0 3px 3px; }
 .tray-open .hv-list { display: block; }
-.hv-li { display: flex; align-items: flex-start; gap: 6px; width: 100%; padding: 3px 2px; border: 0; border-radius: 5px; background: none; text-align: left; font-size: 12px; font-weight: 500; line-height: 1.3; color: var(--text); }
-button.hv-li { cursor: pointer; }
-button.hv-li:hover { background: rgba(15,23,42,.04); }
-.hv-li .wm { --s: 11px; margin-top: 2px; }
+.hv-li { display: flex; align-items: flex-start; gap: 6px; width: 100%; padding: 3px 2px; border-radius: 5px; font-size: 12px; font-weight: 500; line-height: 1.3; color: var(--text); }
+.hv-li:has(button.wbody):hover { background: rgba(15,23,42,.04); }
+.hv-li .wmb { width: 13px; height: 15px; }
+.hv-li .wm { --s: 11px; }
+.hv-li .wbody { align-items: flex-start; }
 .hv-none { font-size: 11.5px; color: var(--faint); padding: 4px 2px; }
 .hv-gut { position: sticky; }
 .hv-gut span { position: absolute; right: 8px; transform: translateY(-50%); font-size: 10.5px; color: var(--muted); }
 .hv-col { position: relative; border-left: 1px solid var(--hair-2); background-image: repeating-linear-gradient(to bottom, transparent 0 calc(var(--hh) - 1px), var(--hair-2) calc(var(--hh) - 1px) var(--hh)); }
-.hv-ev { position: absolute; height: calc(var(--hh) - 4px); padding: 5px 6px 5px 23px; border: 0; border-radius: 8px; text-align: left; overflow: hidden;
+.hv-ev { position: absolute; height: calc(var(--hh) - 4px); border-radius: 8px; overflow: hidden;
   background: var(--tint); color: var(--tx); font-size: 12px; font-weight: 600; line-height: 1.25; transition: box-shadow var(--t) var(--ease); }
-.hv-ev .wm { position: absolute; left: 7px; top: 7px; }
+.hv-ev .wmb { position: absolute; z-index: 1; left: 2px; top: 2px; width: 22px; height: 22px; }
+.hv-ev .wbody { position: absolute; inset: 0; display: block; padding: 5px 6px 5px 23px; }
 .hv-ev .tt { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: inherit; }
 .hv-ev .tm { display: block; font-size: 10.5px; color: var(--muted); }
 .hv-ev.done { background: var(--fill); color: var(--muted); }
 .hv-ev.later { background: #fff; box-shadow: inset 0 0 0 1px var(--hair); color: var(--text-2); }
-button.hv-ev { cursor: pointer; }
-button.hv-ev:hover { box-shadow: inset 0 0 0 1px var(--c), var(--e1); }
+.hv-ev:has(button.wbody):hover { box-shadow: inset 0 0 0 1px var(--c), var(--e1); }
 .hv-now { position: absolute; left: -1px; right: 0; z-index: 1; height: 2px; background: var(--text); pointer-events: none; }
 .hv-now::before { content: ''; position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--text); }
 .hv-now span { position: absolute; right: 3px; top: -9px; padding: 1px 4px; border-radius: 5px; background: var(--text); color: #fff; font-size: 10.5px; }
@@ -527,10 +537,11 @@ button.hv-ev:hover { box-shadow: inset 0 0 0 1px var(--c), var(--e1); }
 .dv-col h3 .mono { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--muted); }
 .dv-stops { position: relative; }
 .dv-track { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
-.dv-stop { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding-right: 6px; border: 0; border-radius: 8px;
-  background: none; text-align: left; font-size: 13px; font-weight: 500; color: var(--text); }
-button.dv-stop { cursor: pointer; }
-button.dv-stop:hover { background: rgba(15,23,42,.035); }
+.dv-stop { position: relative; z-index: 1; display: flex; align-items: center; gap: 4px; width: 100%; height: 32px; padding-right: 6px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: var(--text); }
+.dv-stop:has(button.wbody):hover { background: rgba(15,23,42,.035); }
+.dv-stop .wmb { width: 20px; height: 32px; }
+.dv-stop .wbody { height: 32px; }
 .dv-stop .wm { --s: 14px; border-width: 2px; }
 .dv-stop .tt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dv-stop .tm { flex: none; font-size: 11px; color: var(--muted); }
@@ -541,4 +552,69 @@ button.dv-stop:hover { background: rgba(15,23,42,.035); }
   .dv-lines { grid-column: 1 / -1; grid-row: 2; }
   .dv-grid, .dv-empty { padding-left: 16px; }
 }
-@media (hover: none) { button.dv-stop:hover, button.hv-li:hover, .dv-sum:hover { background: none; } }
+@media (hover: none) { .dv-stop:hover, .hv-li:hover, .dv-sum:hover { background: none !important; } }
+
+/* ---------- adding on the week: click an empty time (or a day's +) ---------- */
+.hv-col[data-col-day] { cursor: cell; }
+.hv-tc[data-tray-day] { cursor: cell; }
+.hv-tc > * { cursor: auto; }
+.hv-tc > button { cursor: pointer; }
+.hv-add { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; border: 0; border-radius: 6px; background: none; color: var(--faint);
+  font-size: 11.5px; font-weight: 500; opacity: 0; transition: opacity var(--t) var(--ease), background var(--t) var(--ease), color var(--t) var(--ease); }
+.hv-tc:hover .hv-add, .hv-add:focus-visible { opacity: 1; }
+.hv-add:hover { background: var(--fill); color: var(--text); }
+@media (hover: none) { .hv-add { opacity: 1; } }
+.hv-ghost { position: absolute; left: 4px; right: 4px; z-index: 2; height: calc(var(--hh) - 4px); padding: 5px 8px; border-radius: 8px;
+  background: var(--accent-tint); box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 600; line-height: 1.25;
+  pointer-events: none; animation: rise var(--t) var(--ease); }
+.hv-ghost span { display: block; }
+.hv-ghost .mono { font-size: 10.5px; font-weight: 400; }
+.hv-ghost.chip { position: static; height: 24px; padding: 0 8px; display: flex; align-items: center; }
+.dv-head { display: flex; align-items: center; }
+.dv-head .dv-sum { flex: 1; min-width: 0; }
+.dv-add { flex: none; width: 30px; height: 30px; margin-right: 10px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; display: grid; place-items: center;
+  transition: background var(--t) var(--ease), color var(--t) var(--ease); }
+.dv-add:hover { background: var(--fill-2); color: var(--text); }
+.dv-add:focus-visible { outline-offset: -2px; }
+
+.wk-new { position: fixed; z-index: 8; width: 300px; padding: 12px; background: #fff; border: 1px solid var(--hair); border-radius: 12px; box-shadow: var(--e1);
+  animation: rise var(--t) var(--ease); }
+.wk-new[hidden] { display: none; }
+@media (max-width: 759px) { .wk-new { width: auto; right: 8px; } }
+.wn-when { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.wn-when .i { color: var(--muted); }
+.wn-when .mono { font-size: 12px; font-weight: 400; color: var(--text); }
+.wn-when .any { font-weight: 500; color: var(--muted); }
+.wn-input { width: 100%; height: 36px; margin-top: 8px; padding: 0 10px; border: 1px solid var(--hair); border-radius: 8px; background: #fff; outline: none;
+  font-size: 14px; font-weight: 500; transition: border-color var(--t) var(--ease), box-shadow var(--t) var(--ease); }
+.wn-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,124,246,.16); }
+.wn-input::placeholder { color: var(--muted); font-weight: 400; }
+.wn-lists { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.wn-lists button { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--fill); cursor: pointer;
+  font-size: 11.5px; font-weight: 500; color: var(--text-2); transition: background var(--t) var(--ease), color var(--t) var(--ease); }
+.wn-lists button .ldot { margin: 0; width: 6px; height: 6px; }
+.wn-lists button:hover { background: var(--fill-2); }
+.wn-lists button[aria-checked="true"] { background: var(--tint); color: var(--tx); font-weight: 600; box-shadow: inset 0 0 0 1px var(--c); }
+.wn-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.wn-add { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  transition: background var(--t) var(--ease), opacity var(--t) var(--ease); }
+.wn-add:hover { background: var(--accent-ink); }
+.wn-add[disabled] { opacity: .4; cursor: default; background: var(--accent); }
+
+/* the editor: one field per thing */
+.wk-new.edit { width: 320px; }
+.wn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wn-f { display: block; margin-top: 8px; }
+.wn-f > span:first-child { display: block; margin-bottom: 3px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.wn-f input, .wn-f select { width: 100%; height: 30px; padding: 0 8px; border: 1px solid var(--hair); border-radius: 7px; background: #fff; outline: none;
+  font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--text); }
+.wn-f select { font-family: 'Figtree', sans-serif; font-size: 12.5px; font-weight: 500; }
+.wn-f input:focus, .wn-f select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,124,246,.16); }
+.wn-f input:disabled { color: var(--faint); background: var(--fill); }
+.wn-time { display: flex; gap: 4px; }
+.wn-time input { flex: 1; min-width: 0; }
+.wn-time button { flex: none; height: 30px; padding: 0 7px; border: 0; border-radius: 7px; background: var(--fill); cursor: pointer; font-size: 11px; font-weight: 500; color: var(--muted); }
+.wn-time button:hover { color: var(--text); }
+.wn-time button.on { background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+.wn-del { height: 28px; padding: 0 8px; margin-left: -6px; border: 0; border-radius: 7px; background: none; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--danger); }
+.wn-del:hover { background: var(--danger-tint); }

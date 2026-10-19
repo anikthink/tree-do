@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { markDone } from './rules';
 import { task } from './test-helpers';
 import type { Plan } from './types';
-import { HISTORY_DAYS, dayItems, logDone, pruneHistory, runsOn, unlogDone, weekDays } from './week';
+import { HISTORY_DAYS, dayItems, logDone, pruneHistory, runsOn, slotSchedule, unlogDone, weekDays } from './week';
 
 const MON = '2026-10-19', TUE = '2026-10-20', WED = '2026-10-21', THU = '2026-10-22', SAT = '2026-10-24', SUN = '2026-10-25';
 const plan = (tasks = [task()]): Plan => ({ dayStart: 4, lines: [{ id: 'l1', code: 'L1', name: 'Work', pal: 0 }], tasks });
@@ -83,5 +83,22 @@ describe('the done-log', () => {
     logDone(p, t, '2026-10-07'); logDone(p, t, '2026-10-08'); logDone(p, t, MON);
     pruneHistory(p, WED);
     expect(Object.keys(p.history ?? {})).toEqual(['2026-10-08', MON]);
+  });
+});
+
+describe('slotSchedule (adding on the week)', () => {
+  const words = { repeat: null, date: null, time: null, someday: false };
+  it('takes the slot\'s day and time', () => {
+    expect(slotSchedule(words, { day: SAT, time: '14:30' }, WED)).toEqual({ date: SAT, time: '14:30' });
+    expect(slotSchedule(words, { day: SAT, time: null }, WED)).toEqual({ date: SAT, time: null });
+  });
+  it('today needs no date (a one-off with none is today\'s)', () => {
+    expect(slotSchedule(words, { day: WED, time: '09:00' }, WED)).toEqual({ date: null, time: '09:00' });
+  });
+  it('the words win: a typed time, a repeat, a day or someday', () => {
+    expect(slotSchedule({ ...words, time: '15:00' }, { day: SAT, time: '09:00' }, WED).time).toBe('15:00');
+    expect(slotSchedule({ ...words, repeat: { type: 'daily' } }, { day: SAT, time: null }, WED).date).toBeNull();
+    expect(slotSchedule({ ...words, date: SUN }, { day: SAT, time: null }, WED).date).toBe(SUN);
+    expect(slotSchedule({ ...words, someday: true }, { day: SAT, time: null }, WED).date).toBeNull();
   });
 });
