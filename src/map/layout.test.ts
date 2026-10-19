@@ -35,19 +35,18 @@ function screenshot(): Plan {
   const titles = ['Get up', 'Make the bed', 'Open curtains', 'Shower', 'Dishes', 'Assemble bookshelf', 'Sweep kitchen & living room', 'Fold clothes'];
   const tasks = titles.map((title, order) => task({ id: 't' + order, title, order, anchor: order === 2 }));
   tasks.push(...['Steps 1–10', 'Unload old shelf', 'Steps 11–13'].map((title, i) => task({ id: 'b' + i, title, order: 8 + i, from: 't5' })));
+  tasks.find(t => t.id === 't6')!.repeat = { type: 'every', n: 2 };
   tasks.push(task({ id: 'mop', title: 'Mop', from: 't6', order: 11 }));
   return { dayStart: 4, lines: [], tasks };
 }
 describe('balanced diagonal desktop layout', () => {
   it('keeps the spine and bookshelf sequence horizontal, with forks on both sides', () => {
     const plan = screenshot();
-    plan.tasks.find(t => t.id === 't6')!.title = 'Sweep';
-    plan.tasks.find(t => t.id === 't7')!.title = 'Fold';
     const map = layoutMap(buildNetwork(plan, TODAY), false);
     check(map, plan);
     expect(plan.tasks.filter(t => !t.from).every(t => map.byKey[t.id]!.y === 0)).toBe(true);
     expect(map.byKey.mop!.y).toBeLessThan(0);
-    expect(map.byKey.b0!.y).toBeGreaterThan(0);
+    expect(map.byKey.b0!.y).toBe(96);
     expect(map.byKey.b1!.y).toBe(map.byKey.b0!.y);
     expect(map.byKey.b2!.y).toBe(map.byKey.b0!.y);
     expect(map.edgeTo.b0!.pts[0]).toEqual([map.byKey.t5!.x, 0]);

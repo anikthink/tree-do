@@ -81,6 +81,12 @@ export function desktopLayout(net: TodayNetwork, ic: Station): { stations: Stati
       const n = stop(t, line, i, base), prev = m.stops.at(-1);
       if (prev) x = Math.max(x, prev.x + COL, prev.x + prev.width / 2 + n.width / 2 + 32);
       if (prev?.key === net.junction && focus.length) x = Math.max(x, prev.x + departure + n.width / 2 + 24);
+      if (prev && forksOf(net.seqs, line.id, prev.key).length) {
+        // Leave a corridor for a 45° ascent past the following stop's label.
+        const siblings = forksOf(net.seqs, line.id, prev.key).length;
+        const peel = Math.max(prev.key === net.junction ? departure : 0, prev.width / 2 + 18) + (siblings - 1) * 16;
+        x = Math.max(x, prev.x + peel + n.height + n.width / 2 + 48);
+      }
       if (t.id === net.junction) x += gap;
       n.x = x; m.stops.push(n);
       if (prev) m.tracks.push(track(prev, n, [[prev.x, 0], [x, 0]]));
@@ -99,9 +105,10 @@ export function desktopLayout(net: TodayNetwork, ic: Station): { stations: Stati
         for (let lane = 1; ; lane++) {
           for (const sign of [preferred, -preferred]) {
             const dy = sign * lane * LANE, peel = Math.max(root.key === net.junction ? departure : 0, sign < 0 ? root.width / 2 + 18 : 0) + j * 16;
-            const dx = root.x + Math.max(COL, peel + 88 + sub.stops[0].width / 2 + 22);
+            const rise = LANE, run = LANE;
+            const dx = root.x + Math.max(COL, peel + run + sub.stops[0].width / 2 + 22);
             const candidate = move(sub, dx, dy), first = candidate.stops[0];
-            candidate.tracks.unshift(track(root, first, [[root.x, 0], [root.x + peel, 0], [root.x + peel + 88, sign * (lane === 1 ? Math.abs(dy) : 88)], [root.x + peel + 88, dy], [first.x, dy]], true));
+            candidate.tracks.unshift(track(root, first, [[root.x, 0], [root.x + peel, 0], [root.x + peel + run, sign * rise], [root.x + peel + run, dy], [first.x, dy]], true));
             if (collides(candidate, m)) continue;
             const stops = [...m.stops, ...candidate.stops];
             const height = Math.max(...stops.map(s => s.y)) - Math.min(...stops.map(s => box(s).y));

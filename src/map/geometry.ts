@@ -15,6 +15,9 @@ export interface Edge {
 }
 
 export function roundPolyline(c: Pt[], r: number): Pt[] {
+  // Shared departures and adjacent routing legs can repeat a corner. Remove
+  // duplicates before rounding so they cannot erase a real bend on either side.
+  c = c.filter((p, i) => !i || p[0] !== c[i - 1][0] || p[1] !== c[i - 1][1]);
   const out: Pt[] = [c[0]];
   for (let i = 1; i < c.length - 1; i++) {
     const P = c[i], A = c[i - 1], Bp = c[i + 1];
