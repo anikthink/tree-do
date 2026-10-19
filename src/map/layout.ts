@@ -1,5 +1,6 @@
 // Where everything sits on the map. Desktop: rows running left → right off the Upkeep spine.
 // Phone: every list is its own column, all running down.
+import { desktopLayout } from './branch-packing';
 import { IC } from '../domain/lines';
 import { forksOf, seqList, type TodayNetwork } from '../domain/network';
 import { isLeftover } from '../domain/rules';
@@ -63,54 +64,10 @@ export function layoutMap(net: TodayNetwork, vertical: boolean): MapLayout {
   const findJunction = (): void => { J = (net.junction && stations.find(s => s.key === net.junction)) || ic; };
 
   if (!vertical) {
-    // Desktop: Upkeep is the spine through the middle, running left → right from Today.
-    // At the junction the focus lines peel off on parallel tracks — alternately above and below — and run right
-    // on their own rows. A branch drops 45° to its own row just below its line.
-    const ROW = 150, SUB = 100, COL = 186, X0 = 150;
-    const heightOf = (l: Line): number => Object.keys(seqs[l.id] ?? {}).filter(k => k !== 'trunk').length * SUB;   // one row per branch
-    const doLine = (l: Line, lineY: number, startX: number, firstCorners: (x: number, y: number) => Pt[], fromSt: Station): void => {
-      let sub = 0;
-      const place = (list: Task[], sx: number, rowY: number, from: Station, labelBase: string, isTrunk: boolean): void => {
-        let prev = from;
-        list.forEach((t, j) => {
-          const st: Station = { key: t.id, t, line: l, x: sx + j * COL, y: rowY, side: 'a', idx: j,
-            label: labelBase ? `${labelBase}/${j + 1}` : pad2(j + 1), old: isLeftover(t, today) };
-          stations.push(st);
-          let corners: Pt[];
-          if (isTrunk && j === 0) corners = firstCorners(st.x, rowY);
-          else if (prev.y !== rowY) corners = [[prev.x, prev.y], [prev.x + (rowY - prev.y), rowY], [st.x, rowY]];
-          else corners = [[prev.x, prev.y], [st.x, rowY]];
-          const e = mkEdge(corners, l.color, st.key);
-          if (isTrunk && j === 0 && fromSt !== ic) e.under = true;   // shares the Upkeep track before peeling off
-          edges.push(e);
-          prev = st;
-          forksOf(seqs, l.id, t.id).forEach(k => { sub++; place(seqList(seqs, l.id, k), st.x + COL, lineY + sub * SUB, st, st.label, false); });
-        });
-        const endX = list.length ? prev.x : sx - 60;
-        termini.push({ line: l, x: endX, y: rowY, empty: !list.length, from: prev, vertical: false, branch: !isTrunk,
-          stub: list.length ? [[prev.x, rowY], [prev.x + 30, rowY]] : firstCorners(endX + 30, rowY) });
-      };
-      place(seqList(seqs, l.id, 'trunk'), startX, lineY, fromSt, '', true);
-    };
-    doLine(up, 0, X0, (x, ry) => [[0, 0], [x, ry]], ic);
-    findJunction();
-    // alternate: 1st focus line just above, 2nd just below, 3rd above that, 4th below that
-    const above = focus.filter((_, i) => i % 2 === 0), below = focus.filter((_, i) => i % 2 === 1);
-    let topEdge = 0;                       // top of the spine's block
-    // Focus lines share the Upkeep track for a moment after the junction, then peel off.
-    // The nearest line peels off last (furthest right), so no track ever crosses another.
-    const peel = (k: number, n: number): number => J.x + 58 + (n - 1 - k) * 13;
-    above.forEach((l, k) => {
-      const lineY = topEdge - ROW - heightOf(l), px = peel(k, above.length);
-      doLine(l, lineY, J.x + COL, (x, ry) => [[J.x, J.y], [px, J.y], [px, ry], [x, ry]], J);
-      topEdge = lineY;
-    });
-    let bottomEdge = heightOf(up);         // bottom of the spine's block (its own branches sit below it)
-    below.forEach((l, k) => {
-      const lineY = bottomEdge + ROW, px = peel(k, below.length);
-      doLine(l, lineY, J.x + COL, (x, ry) => [[J.x, J.y], [px, J.y], [px, ry], [x, ry]], J);
-      bottomEdge = lineY + heightOf(l);
-    });
+    const desktop = desktopLayout(net, ic);
+    stations.push(...desktop.stations);
+    edges.push(...desktop.edges);
+    termini.push(...desktop.termini);
   } else {
     // Phone: every list is its own column, side by side, all running down — like a route chart.
     // Upkeep leaves Today in the left column. At the junction the focus lists cross over as a small bundle

@@ -124,7 +124,12 @@ export function startTreeDo(): void {
   document.body.classList.toggle('pinned', isWide(view));
   sheet.setSnap('peek', { instant: true }); key.renderLegend(); a11y.renderList(); today.refreshHud(); add.renderChips(); week.setMode(st.week.mode);
   if (document.fonts && document.fonts.load) {
-    Promise.all([document.fonts.load('600 13.5px Figtree'), document.fonts.load('500 11px Figtree'), document.fonts.load('400 12px "Geist Mono"')]).then(() => { if (!st.userMoved) camera.initialView(); }).catch(() => {});
+    Promise.all([document.fonts.load('600 13.5px Figtree'), document.fonts.load('500 11px Figtree'), document.fonts.load('400 12px "Geist Mono"')]).then(() => {
+      // Desktop lane clearance depends on the loaded font's label widths.
+      rebuild();
+      st.anims = st.anims.flatMap(a => { const e = st.map.edgeTo[a.e.to]; return e ? [{ ...a, e }] : []; });
+      if (!st.userMoved) camera.initialView();
+    }).catch(() => {});
   }
   function frame(now: number): void { update(now); renderer.draw(now); requestAnimationFrame(frame); }
   // Trains must always arrive, even if animation frames are throttled (background tab, battery saver).
