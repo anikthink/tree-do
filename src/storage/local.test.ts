@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { STORAGE_KEY, loadState, saveState } from './local';
+import { STORAGE_KEY, VIEW_KEY, loadState, loadView, saveState, saveView } from './local';
 
 describe('local storage', () => {
   beforeEach(() => localStorage.clear());
@@ -24,5 +24,19 @@ describe('local storage', () => {
     expect(loadState()).toBeNull();
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ dayStart: 4 }));
     expect(loadState()).toBeNull();
+  });
+});
+
+describe('view preference', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('defaults to the map and the next seven days', () => {
+    expect(loadView()).toEqual({ mode: 'map', range: 'next' });
+  });
+  it('round-trips, and ignores values it does not know', () => {
+    saveView({ mode: 'days', range: 'week' });
+    expect(loadView()).toEqual({ mode: 'days', range: 'week' });
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ mode: 'month', range: 7 }));
+    expect(loadView()).toEqual({ mode: 'map', range: 'next' });
   });
 });

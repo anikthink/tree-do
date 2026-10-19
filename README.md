@@ -9,6 +9,7 @@ A to-do app for ADHD brains, drawn as a map. Each day starts on one line: Upkeep
 - **The map:** the track to a task stays dashed until it's done (grey while it's later, in the list's colour when it's ready), then fills in solid when you tick it.
 - **Hold a task** for: later today, tomorrow, someday, do it now (skip ahead), branch, edit, delete. Everything can be undone.
 - **No overdue pile.** The map is rebuilt each morning (your day starts at 4am by default): unfinished one-off tasks carry over quietly and repeats come back on their days.
+- **The week:** switch from the Map to **Hours** (a calendar grid for timed tasks, everything else in an Anytime tray) or **Days** (a row per day, each folding to a strip of tiny lines). Show the next 7 days or this week (Mon–Sun); earlier days list what you ticked off. Tick today's tasks right there; tap a later one to edit it in the plan.
 - **Layout:** on desktop the panel is pinned beside a left-to-right map; on phones lists become columns and the panel is a pull-up sheet.
 
 ## Run it locally
@@ -48,6 +49,7 @@ src/domain/              pure, unit-tested; no DOM
   parse.ts               plain-words parser, rule text
   lines.ts               lists and their colours
   network.ts             today's network: what's on the map, branches, junction, task states
+  week.ts                the week: what falls on each day (projected rules, the done-log)
   seed.ts                the sample day
 
 src/map/                 the canvas map
@@ -71,9 +73,10 @@ src/ui/                  the panel
   notice.ts              notice / undo bar, live region
   a11y.ts                hidden keyboard / screen-reader task list
   keyboard.ts            global keys (Esc, N)
+  week.ts                Map / Hours / Days switch, and the Hours and Days views
   dom.ts, icons.ts, format.ts   element lookup, icons, meta HTML
 
-src/storage/local.ts     saving (browser localStorage under `tree-do:v1`)
+src/storage/local.ts     saving (browser localStorage under `tree-do:v1`; the last view under `tree-do:view`)
 src/styles.css           the Calm design
 ```
 

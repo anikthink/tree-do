@@ -8,7 +8,7 @@ import { createRenderer } from '../map/draw';
 import { installMapInput } from '../map/input';
 import { layoutMap } from '../map/layout';
 import { finishTrains, seedArrived } from '../map/trains';
-import { loadState, saveState } from '../storage/local';
+import { loadState, loadView, saveState } from '../storage/local';
 import { createA11yList } from '../ui/a11y';
 import { createAddField } from '../ui/add';
 import { getDom } from '../ui/dom';
@@ -20,6 +20,7 @@ import { createPlanView } from '../ui/plan';
 import { createSheet } from '../ui/sheet';
 import { createTodayView } from '../ui/today';
 import { createViews } from '../ui/views';
+import { createWeekView } from '../ui/week';
 import { createActions } from './actions';
 import type { App } from './context';
 import { createStore, initialState } from './store';
@@ -35,7 +36,7 @@ export function startTreeDo(): void {
   const clock = clockFromQuery(location.search);
   const plan = loadState() ?? seed(serviceDay(4, clock()));
   const reducedMotion = !!window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const store = createStore(initialState(plan, clock, reducedMotion));
+  const store = createStore(initialState(plan, clock, reducedMotion, loadView()));
   store.subscribe(change => { if (change === 'plan') saveState(store.state.plan); });
   const st = store.state, view = st.view;
 
@@ -61,7 +62,7 @@ export function startTreeDo(): void {
     setSnap: (n, o) => sheet.setSnap(n, o), setTab: t => views.setTab(t), applyH: h => sheet.applyH(h),
     sheetH: () => sheet.sheetH(), sheetExpanded: () => sheet.sheetExpanded(),
     refreshHud: () => today.refreshHud(), renderList: () => a11y.renderList(), renderLegend: () => key.renderLegend(),
-    renderChips: () => add.renderChips(), renderTimetable: () => planView.renderTimetable(), ttOpen: () => planView.ttOpen(),
+    renderChips: () => add.renderChips(), renderTimetable: () => planView.renderTimetable(), renderWeek: () => week.render(), ttOpen: () => planView.ttOpen(),
     openTimetable: id => planView.openTimetable(id), openMenu: k => hold.openMenu(k), closeMenu: o => hold.closeMenu(o),
     startBranch: k => add.startBranch(k), toast: (tag, msg, u) => notice.toast(tag, msg, u), say: m => notice.say(m),
     placeNotice: () => notice.placeNotice(),
@@ -80,6 +81,7 @@ export function startTreeDo(): void {
   const key = createKeyView(store, dom, app);
   const notice = createNotice(store, dom, app);
   const a11y = createA11yList(store, dom, app);
+  const week = createWeekView(store, dom, app);
   installMapInput(store, dom, camera, renderer.labelRects, app);
 
   // ---- viewport
@@ -120,7 +122,7 @@ export function startTreeDo(): void {
   rebuild(); seedArrived(st);
   resize(); camera.initialView();
   document.body.classList.toggle('pinned', isWide(view));
-  sheet.setSnap('peek', { instant: true }); key.renderLegend(); a11y.renderList(); today.refreshHud(); add.renderChips();
+  sheet.setSnap('peek', { instant: true }); key.renderLegend(); a11y.renderList(); today.refreshHud(); add.renderChips(); week.setMode(st.week.mode);
   if (document.fonts && document.fonts.load) {
     Promise.all([document.fonts.load('600 13.5px Figtree'), document.fonts.load('500 11px Figtree'), document.fonts.load('400 12px "Geist Mono"')]).then(() => { if (!st.userMoved) camera.initialView(); }).catch(() => {});
   }

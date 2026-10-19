@@ -64,8 +64,18 @@ export interface Plan {
   dayStart: number;
   lines: List[];
   tasks: Task[];
+  /** What was ticked off on each past day (the week view's earlier days). Kept for two weeks; older plans have none. */
+  history?: Record<string, DoneEntry[] | undefined>;
 }
 export type SavedState = Plan;
+
+/** A task as it was when ticked off. A copy, because finished one-offs leave the plan the next day. */
+export interface DoneEntry {
+  id: string;
+  line: string;
+  title: string;
+  time: string | null;
+}
 
 /** A task's place on today's map: finished, ready to do, or later in its line. */
 export type LineState = 'done' | 'avail' | 'locked';

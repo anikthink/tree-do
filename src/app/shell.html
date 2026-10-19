@@ -3,6 +3,13 @@
 
 <canvas id="map" aria-label="Map of today's tasks. Use the task list buttons to move around by keyboard."></canvas>
 
+<div class="modes" id="modes" role="tablist" aria-label="View">
+  <button class="mtab" role="tab" type="button" data-mode="map" aria-controls="map" aria-selected="true">Map</button>
+  <button class="mtab" role="tab" type="button" data-mode="hours" aria-controls="week" aria-selected="false" tabindex="-1">Hours</button>
+  <button class="mtab" role="tab" type="button" data-mode="days" aria-controls="week" aria-selected="false" tabindex="-1">Days</button>
+</div>
+<section class="week" id="week" role="tabpanel" aria-label="The week" hidden></section>
+
 <nav class="sr-only" aria-label="Tasks"><ul id="a11y"></ul></nav>
 <div id="live" class="sr-only" aria-live="polite"></div>
 

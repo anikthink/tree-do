@@ -4,6 +4,7 @@ import { type Where, canPlace, isDone, markDone, nextOrder, placeNear, pruneFini
 import { seed } from '../domain/seed';
 import { serviceDay } from '../domain/time';
 import { isPlan } from '../domain/types';
+import { logDone, pruneHistory, unlogDone } from '../domain/week';
 import { dispatchTrains, seedArrived } from '../map/trains';
 import { vstate } from '../map/status';
 import type { App, MoveKind } from './context';
@@ -17,14 +18,16 @@ export function createActions(store: Store, app: App, rebuild: () => void) {
 
   function replan(opts: { instant?: boolean } = {}): void {
     // one-off stops finished on an earlier day are history: they leave the plan quietly
-    st.plan.tasks = pruneFinished(st.plan.tasks, serviceDay(st.plan.dayStart, st.clock()));
+    const day = serviceDay(st.plan.dayStart, st.clock());
+    st.plan.tasks = pruneFinished(st.plan.tasks, day);
+    pruneHistory(st.plan, day);
     rebuild();
     // drop arrivals for stations that no longer exist or became locked again
     [...st.arrived].forEach(k => { const s = st.states[k]; if (!s || s === 'locked') st.arrived.delete(k); });
     st.anims = st.anims.flatMap(a => { const e = st.map.edgeTo[a.e.to]; return e && st.states[a.e.to] !== 'locked' ? [{ ...a, e }] : []; });
     if (opts.instant) seedArrived(st); else dispatchTrains(st, performance.now());
     store.notify('plan');
-    app.refreshHud(); app.renderList();
+    app.refreshHud(); app.renderList(); app.renderWeek();
     if (app.ttOpen()) app.renderTimetable();
   }
 
@@ -50,6 +53,7 @@ export function createActions(store: Store, app: App, rebuild: () => void) {
     const express = v === 'locked';
     snapshot();
     markDone(t, st.today);
+    logDone(st.plan, t, st.today);
     if (express) st.arrived.delete(key);
     st.popAt[key] = now; st.shakeAt[key] = null;
     st.dings.push({ x: s.x, y: s.y, color: s.line.color, t0: now, big: true });
@@ -76,7 +80,7 @@ export function createActions(store: Store, app: App, rebuild: () => void) {
       case 'later': t.order = nextOrder(st.plan.tasks); msg = `“${t.title}” moved to the end of its list.`; break;
       case 'tomorrow': putOffToTomorrow(t, today); msg = t.repeat ? `Skipping “${t.title}” today. Back tomorrow.` : `“${t.title}” is off today's map. Back tomorrow.`; break;
       case 'someday': t.someday = true; msg = `“${t.title}” parked for someday. It's in the plan.`; break;
-      case 'undone': reopen(t, today); msg = `“${t.title}” is open again.`; break;
+      case 'undone': reopen(t, today); unlogDone(st.plan, t.id, today); msg = `“${t.title}” is open again.`; break;
       case 'delete': removeTask(st.plan, t); msg = `“${t.title}” removed.`; break;
     }
     replan();
@@ -96,7 +100,7 @@ export function createActions(store: Store, app: App, rebuild: () => void) {
     if (serviceDay(st.plan.dayStart, st.clock()) !== st.today) {
       st.arrived.clear(); st.anims = []; replan({ instant: true });
       app.toast('NEW DAY', 'Fresh map for today. Yesterday is done with.');
-    } else app.refreshHud();
+    } else { app.refreshHud(); app.renderWeek(); }
   }
 
   /** Dragged into place: right before or after another task, in its list and on its branch. */

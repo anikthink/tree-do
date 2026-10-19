@@ -28,6 +28,8 @@ export interface App {
   renderLegend(): void;
   renderChips(): void;
   renderTimetable(): void;
+  /** The Hours / Days views, when one is showing. */
+  renderWeek(): void;
   ttOpen(): boolean;
   openTimetable(focusId?: string): void;
   openMenu(key: string): void;

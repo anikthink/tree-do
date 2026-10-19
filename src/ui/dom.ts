@@ -22,6 +22,8 @@ export function getDom() {
     undoBar: byId('undoBar', div), undoTag: byId('undoTag', div), undoMsg: byId('undoMsg', div), undoBtn: byId('undoBtn', btn),
     addBox: byId('addBox', div), addInput: byId('addInput', HTMLInputElement), chips: byId('chips', div),
     todayList: byId('todayList', div), ttBody: byId('ttBody', div), lines: byId('lines', div),
+    week: byId('week', div),
+    modeBtns: [...document.querySelectorAll('.mtab')].filter((b): b is HTMLButtonElement => b instanceof HTMLButtonElement),
     hold: byId('hold', div), holdHead: byId('holdHead', div), hacts: byId('hacts', div), hrule: byId('hrule', div),
   };
 }

@@ -3,12 +3,15 @@
 import type { TodayNetwork } from '../domain/network';
 import type { Clock } from '../domain/time';
 import type { LineState, Plan } from '../domain/types';
+import type { WeekRange } from '../domain/week';
 import { emptyLayout, type MapLayout } from '../map/layout';
 import type { Anim, Ding } from '../map/trains';
 import { PEEK, type Viewport } from './viewport';
 
 export type Snap = 'peek' | 'half' | 'full';
 export type Tab = 'today' | 'tt' | 'key';
+/** What fills the screen beside the panel: today's map, or the week as hours or as days. */
+export type Mode = 'map' | 'hours' | 'days';
 export interface Cam { s: number; ox: number; oy: number }
 export interface Spring { h: number; v: number; target: number; from: number; raf: number; last: number }
 
@@ -42,6 +45,8 @@ export interface AppState {
   add: { from: string | null; fork: number | null };
   /** JSON of the plan before the last change, while its Undo is on offer. */
   undoSnap: string | null;
+  /** The week views: which one shows, which seven days, the days opened in Days, and the Anytime tray in Hours. */
+  week: { mode: Mode; range: WeekRange; open: Set<string>; tray: boolean };
 }
 
 export type Change = 'plan';
@@ -51,7 +56,7 @@ export interface Store {
   notify(change: Change): void;
 }
 
-export function initialState(plan: Plan, clock: Clock, reducedMotion: boolean): AppState {
+export function initialState(plan: Plan, clock: Clock, reducedMotion: boolean, view: { mode: Mode; range: WeekRange } = { mode: 'map', range: 'next' }): AppState {
   return {
     plan, clock, reducedMotion,
     today: '',
@@ -66,6 +71,7 @@ export function initialState(plan: Plan, clock: Clock, reducedMotion: boolean): 
     hold: { key: null, returnTo: null, prev: 'peek', swallowPtr: false },
     add: { from: null, fork: null },
     undoSnap: null,
+    week: { ...view, open: new Set(), tray: false },
   };
 }
 

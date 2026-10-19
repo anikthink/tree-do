@@ -16,13 +16,15 @@ export const CARD_W = 344;
 /** Phone columns: column width and the sticky column-name row. */
 export const COLW_V = 150;
 export const HEAD_V = 34;
+/** The Map / Hours / Days switch across the top, which the phone's column names sit under. */
+export const MODES_H = 40;
 
 export const isDesk = (v: Viewport): boolean => v.W >= 760;
 /** Wide desktop: the sheet is pinned open as a full-height panel and the map sits to its right. */
 export const isWide = (v: Viewport): boolean => v.W >= 1100 && v.W > v.H * 1.1;
 /** Phones (and tall windows) draw lists as columns. */
 export const isVertical = (w: number, h: number): boolean => w < 760 || h > w * 1.15;
-export const headTop = (v: Viewport): number => Math.max(6, v.safeT + 4);
+export const headTop = (v: Viewport): number => Math.max(6, v.safeT + 4) + MODES_H;
 export const mapTopV = (v: Viewport): number => headTop(v) + HEAD_V + 6;
 
 export function measureSafeInsets(): { top: number; bottom: number } {
